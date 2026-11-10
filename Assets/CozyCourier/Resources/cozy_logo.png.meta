@@ -1,10 +1,19 @@
 fileFormatVersion: 2
-guid: 182e9fd30efe06840a87a7aa4a6deda0
+guid: c9eb4c9d20f9e15469556f88637c18ea
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: 882074314238418509
-    second: icon_1024_0
+      213: 4819898218469572347
+    second: cozy_logo_0
+  - first:
+      213: -7570500663069052196
+    second: cozy_logo_1
+  - first:
+      213: -5486247579600948968
+    second: cozy_logo_2
+  - first:
+      213: 428054236342845200
+    second: cozy_logo_3
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -126,13 +135,13 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: icon_1024_0
+      name: cozy_logo_0
       rect:
         serializedVersion: 2
-        x: 0
-        y: 0
-        width: 1024
-        height: 1024
+        x: 166
+        y: 121
+        width: 180
+        height: 302
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -141,8 +150,74 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: d4e5da55ae1cd3c00800000000000000
-      internalID: 882074314238418509
+      spriteID: bfeba6d84e7b3e240800000000000000
+      internalID: 4819898218469572347
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: cozy_logo_1
+      rect:
+        serializedVersion: 2
+        x: 325
+        y: 368
+        width: 24
+        height: 21
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: cd2f8e5d1cd20f690800000000000000
+      internalID: -7570500663069052196
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: cozy_logo_2
+      rect:
+        serializedVersion: 2
+        x: 138
+        y: 294
+        width: 29
+        height: 30
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 811f90cc4eeecd3b0800000000000000
+      internalID: -5486247579600948968
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: cozy_logo_3
+      rect:
+        serializedVersion: 2
+        x: 335
+        y: 298
+        width: 44
+        height: 44
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 01ff0dd5f01c0f500800000000000000
+      internalID: 428054236342845200
       vertices: []
       indices: 
       edges: []

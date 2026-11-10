@@ -172,7 +172,9 @@ namespace CozyCourier
             hud.Build();
             cut = gameObject.AddComponent<Cutscene>();
             Ads.Init();
+            Shop.Init();
             ShowMenu();
+            hud.ShowSplash();
         }
 
         void EnsureEventSystem()
@@ -309,36 +311,72 @@ namespace CozyCourier
         void AddCar(Transform root, bool h, int dir, int row, float lane, float p, float v, Color col)
         {
             var mb = new MB();
-            float len = h ? 36 : 20, wid = h ? 20 : 36, X = -len / 2, Y = -wid / 2, hh = 12, ox = hh * Art.OX, oy = hh * Art.OY;
-            mb.RRect(X + 3, Y + 3, len + 4, wid + 2, 5, new Color(.06f, .09f, .13f, .3f));
-            var tyre = Art.Hex("#1e2226");
-            if (h) { mb.Rect(X + 5, Y - 1, 7, 3, tyre); mb.Rect(X + len - 12, Y - 1, 7, 3, tyre); mb.Rect(X + 5, Y + wid - 2, 7, 3, tyre); mb.Rect(X + len - 12, Y + wid - 2, 7, 3, tyre); }
-            else { mb.Rect(X - 1, Y + 5, 3, 7, tyre); mb.Rect(X + len - 2, Y + 5, 3, 7, tyre); mb.Rect(X - 1, Y + wid - 12, 3, 7, tyre); mb.Rect(X + len - 2, Y + wid - 12, 3, 7, tyre); }
-            mb.Quad(new Vector2(X + len, Y), new Vector2(X + len, Y + wid), new Vector2(X + len + ox, Y + wid + oy), new Vector2(X + len + ox, Y + oy), Art.Shade(col, -.32f));
-            mb.Quad(new Vector2(X, Y + wid), new Vector2(X + len, Y + wid), new Vector2(X + len + ox, Y + wid + oy), new Vector2(X + ox, Y + wid + oy), Art.Shade(col, -.16f));
-            mb.RRect(X + ox, Y + oy, len, wid, 4, col);
-            float cx = X + ox + (h ? len * .26f : 3), cy = Y + oy + (h ? 3 : wid * .26f), cw = h ? len * .46f : 14, ch = h ? wid - 6 : wid * .46f;
-            mb.RRect(cx, cy, cw, ch, 2.5f, Art.Hex("#2c3e52"));
-            mb.RRect(cx + (h ? 4 : 2), cy + (h ? 2 : 4), cw - (h ? 8 : 4), ch - (h ? 4 : 8), 2, Art.Shade(col, .08f));
-            mb.Rect(cx + 1, cy + 1, h ? 3 : cw - 2, h ? ch - 2 : 3, new Color(1, 1, 1, .35f));
-            float fx0 = X + ox, fy0 = Y + oy;
-            var hl = Art.Hex("#fff3c4"); var tl = Art.Hex("#c0443a");
-            if (h)
-            {
-                float fxx = dir > 0 ? fx0 + len - 3 : fx0, bx = dir > 0 ? fx0 : fx0 + len - 2;
-                mb.Rect(fxx, fy0 + 2, 3, 4, hl); mb.Rect(fxx, fy0 + wid - 6, 3, 4, hl);
-                mb.Rect(bx, fy0 + 2, 2, 4, tl); mb.Rect(bx, fy0 + wid - 6, 2, 4, tl);
-            }
-            else
-            {
-                float fyy = dir > 0 ? fy0 + wid - 3 : fy0, by = dir > 0 ? fy0 : fy0 + wid - 2;
-                mb.Rect(fx0 + 2, fyy, 4, 3, hl); mb.Rect(fx0 + len - 6, fyy, 4, 3, hl);
-                mb.Rect(fx0 + 2, by, 4, 2, tl); mb.Rect(fx0 + len - 6, by, 4, 2, tl);
-            }
+            DrawCar(mb, h, dir, col, cars.Count % 4 == 3);
             var mr = Art.MeshObj(root, "Car", mb.Build(), 1000);
             var car = new Car { t = mr.transform, mr = mr, h = h, dir = dir, row = row, lane = lane, p = p, startP = p, v = v, cur = v };
             car.glow = Art.Spr(root, Art.Soft, 0, 0, 60, 60, Color.clear, 5001, "Headlight");
             cars.Add(car);
+        }
+
+        /// <summary>
+        /// Mashina chizmasi (2.5D): g'ildiraklar, qavariq kuzov, oynali salon, tom, faralar.
+        /// u — mashina uzunligi bo'ylab (old tomon +u), v — eni bo'ylab, z — balandlik.
+        /// van = true bo'lsa, Damas kabi uzun salonli kichik avtobus.
+        /// </summary>
+        static void DrawCar(MB mb, bool h, int dir, Color col, bool van)
+        {
+            const float L = 38, W = 20;
+            float s = dir > 0 ? 1 : -1;
+            // u,v,z -> xarita nuqtasi (to'g'ri to'rtburchak uchun)
+            void RR(float u0, float u1, float v0, float v1, float z, float r, Color c)
+            {
+                float a0 = Mathf.Min(u0 * s, u1 * s), a1 = Mathf.Max(u0 * s, u1 * s);
+                float x0, y0, w, hh;
+                if (h) { x0 = a0; w = a1 - a0; y0 = v0; hh = v1 - v0; }
+                else { y0 = a0; hh = a1 - a0; x0 = v0; w = v1 - v0; }
+                mb.RRect(x0 + z * Art.OX, y0 + z * Art.OY, w, hh, Mathf.Min(r, Mathf.Min(w, hh) / 2), c);
+            }
+            void Stack(float u0, float u1, float v0, float v1, float z0, float z1, float r, Color c)
+            {
+                for (float z = z0; z < z1; z += 1f) RR(u0, u1, v0, v1, z, r, c);
+            }
+
+            var dark = Art.Shade(col, -.38f);
+            var side = Art.Shade(col, -.2f);
+            var glass = Art.Hex("#2b3d50");
+            var glassHi = Art.Hex("#4f6f8c");
+
+            // soya
+            RR(-L / 2 + 2, L / 2 + 3, -W / 2 + 2, W / 2 + 4, 0, 7, new Color(.05f, .07f, .1f, .32f));
+            // g'ildiraklar
+            var tyre = Art.Hex("#16191c");
+            foreach (float wu in new[] { -L / 2 + 8, L / 2 - 9 })
+                foreach (float wv in new[] { -W / 2 - 1.2f, W / 2 - 4.8f })
+                    Stack(wu - 4, wu + 4, wv, wv + 6, 0, 4, 2.5f, tyre);
+            // kuzov yon devorlari va ustki qismi
+            Stack(-L / 2, L / 2, -W / 2, W / 2, 2, 7, 6, dark);
+            RR(-L / 2, L / 2, -W / 2, W / 2, 7, 6, side);
+            RR(-L / 2 + .5f, L / 2 - .5f, -W / 2 + .5f, W / 2 - 1.5f, 8, 6, col);
+            // yaltiroq chiziq (kuzov yon tomoni bo'ylab)
+            RR(-L / 2 + 5, L / 2 - 6, -W / 2 + 1.5f, -W / 2 + 3.5f, 8.5f, 1, Art.Shade(col, .28f));
+            // faralar va orqa chiroqlar
+            var hl = Art.Hex("#fff3c4"); var tl = Art.Hex("#d9453a");
+            RR(L / 2 - 3, L / 2 - .5f, -W / 2 + 2, -W / 2 + 6, 7.5f, 1.5f, hl);
+            RR(L / 2 - 3, L / 2 - .5f, W / 2 - 6, W / 2 - 2, 7.5f, 1.5f, hl);
+            RR(-L / 2 + .5f, -L / 2 + 2.5f, -W / 2 + 2, -W / 2 + 6, 7.5f, 1, tl);
+            RR(-L / 2 + .5f, -L / 2 + 2.5f, W / 2 - 6, W / 2 - 2, 7.5f, 1, tl);
+
+            // salon: oynalar (devor) + tom
+            float c0 = van ? -L / 2 + 3 : -L / 2 + 9, c1 = van ? L / 2 - 8 : L / 2 - 12;
+            Stack(c0, c1, -W / 2 + 2, W / 2 - 2, 8, 13, 4, glass);
+            RR(c0, c1, -W / 2 + 2, W / 2 - 2, 13, 4, glassHi);           // old va orqa oyna ko'rinadi
+            RR(c0 + (van ? 2 : 3.5f), c1 - (van ? 2.5f : 4.5f), -W / 2 + 2.5f, W / 2 - 2.5f, 13.5f, 3, Art.Shade(col, .1f)); // tom
+            RR(c0 + 5, c1 - 7, -W / 2 + 4, -W / 2 + 6, 14, 1, new Color(1, 1, 1, .28f)); // tomdagi yaltiroq
+            if (van)
+            {
+                // Damas: yon oynalar chizig'i
+                for (int k = 0; k < 3; k++) RR(c0 + 3 + k * 8, c0 + 9 + k * 8, -W / 2 + 2, -W / 2 + 3, 10.5f, .5f, glassHi);
+            }
         }
 
         void BuildCourier()

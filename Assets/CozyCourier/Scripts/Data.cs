@@ -48,7 +48,7 @@ namespace CozyCourier
     }
 
     public class Upg { public string id; public string[] name, desc; public int[] prices; public string col; }
-    public class LookItem { public string id; public string[] name; public string c0, c1; public int price, lvl; public bool ikat; }
+    public class LookItem { public string id; public string[] name; public string c0, c1; public int price, lvl; public bool ikat, vip; }
     public class Reno { public string id; public string[] name, desc; public int price; public string[][] lines; }
 
     // ===================== Ma'lumotlar =====================
@@ -292,7 +292,8 @@ namespace CozyCourier
                 new LookItem{ id="violet", name=T("Binafsha","Фиалка","Violet"), c0="#b99cf0", c1="#6f4fb5", price=15000 },
                 new LookItem{ id="yellow", name=T("Limon","Лимон","Lemon"), c0="#ffe08a", c1="#d4a72c", price=15000 },
                 new LookItem{ id="blue", name=T("Osmon","Небо","Sky"), c0="#8cc4ff", c1="#2f6fc2", price=20000 },
-                new LookItem{ id="night", name=T("Tungi","Ночной","Night"), c0="#6a7480", c1="#22282e", price=25000 } }},
+                new LookItem{ id="night", name=T("Tungi","Ночной","Night"), c0="#6a7480", c1="#22282e", price=25000 },
+                new LookItem{ id="gold", name=T("Oltin","Золотой","Golden"), c0="#ffe08a", c1="#c9962a", vip=true } }},
             {"helmet", new[]{
                 new LookItem{ id="orange", name=T("To'q sariq","Оранжевый","Orange"), c0="#ffcf8a", c1="#e88a3c" },
                 new LookItem{ id="white", name=T("Oq","Белый","White"), c0="#ffffff", c1="#c2cbd1", price=10000 },

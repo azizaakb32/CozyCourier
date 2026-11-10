@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: a2eea32aeb5416042b5f71b54d1c13df
+guid: 6a591da3f59b003459f8e36792912494
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: -5540517708530178899
-    second: feature_graphic_1024x500_0
+      213: 8649127360083827864
+    second: adaptive_background_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -126,13 +126,13 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: feature_graphic_1024x500_0
+      name: adaptive_background_0
       rect:
         serializedVersion: 2
         x: 0
         y: 0
         width: 1024
-        height: 500
+        height: 1024
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -141,8 +141,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: da42c4fbf702c13b0800000000000000
-      internalID: -5540517708530178899
+      spriteID: 89c98ea428fd70870800000000000000
+      internalID: 8649127360083827864
       vertices: []
       indices: 
       edges: []

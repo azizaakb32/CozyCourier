@@ -20,6 +20,10 @@ namespace CozyCourier
         public static string District { get => GS("district", "markaz"); set => SS("district", value); }
         public static bool GaiMet { get => GI("gaimet") == 1; set => SI("gaimet", value ? 1 : 0); }
 
+        /// <summary>Pullik xaridlar (o'chirib yuborilmaydi).</summary>
+        public static bool NoAds { get => GI("iap_noads") == 1; set => SI("iap_noads", value ? 1 : 0); }
+        public static bool Vip { get => GI("iap_vip") == 1; set => SI("iap_vip", value ? 1 : 0); }
+
         public static int Up(string id) => GI("up_" + id);
         public static void SetUp(string id, int v) => SI("up_" + id, v);
         public static bool Owned(string cat, string id) => Data.Looks[cat][0].id == id || GI("own_" + cat + "_" + id) == 1;
@@ -38,9 +42,10 @@ namespace CozyCourier
         /// <summary>Hamma natijani o'chiradi, lekin til va ovoz sozlamalarini qoldiradi.</summary>
         public static void ResetAll()
         {
-            int lang = Lang; bool music = Music, sfx = Sfx;
+            int lang = Lang; bool music = Music, sfx = Sfx, noAds = NoAds, vip = Vip;
             PlayerPrefs.DeleteAll();
-            Lang = lang; Music = music; Sfx = sfx;
+            Lang = lang; Music = music; Sfx = sfx; NoAds = noAds; Vip = vip;
+            if (vip) Own("scooter", "gold");
         }
     }
 }

@@ -10,7 +10,7 @@ namespace CozyCourier
     {
         Game G => Game.I;
 
-        enum View { Menu, Free, Settings, Help, Garage, Play, Pause, End, Cut }
+        enum View { Menu, Free, Settings, Help, Garage, Play, Pause, End, Cut, Shop }
         View view = View.Menu;
         public bool MenuIsRoot => view == View.Menu;
 
@@ -23,7 +23,8 @@ namespace CozyCourier
         readonly List<RectTransform> markerPool = new List<RectTransform>();
 
         // oynalar
-        RectTransform ovMenu, ovFree, ovSettings, ovHelp, ovGarage, ovPause, ovEnd;
+        RectTransform ovMenu, ovFree, ovSettings, ovHelp, ovGarage, ovPause, ovEnd, ovShop;
+        RectTransform shopItems; UText shopToast, shopWallet, gAdBtnLbl; Button gAdBtn; bool shopFromGarage;
         UText menuWallet, menuLvl, storySub, setToast, gWallet, gLvl, gToast, endEyebrow, endTitle, endMoney, endInfo, endUnlock, endToast;
         RectTransform districtsBox, confirmBox, gItems, gTabs;
         Button endDouble, endNext;
@@ -56,7 +57,8 @@ namespace CozyCourier
             cv.sortingOrder = 10;
             var sc = go.AddComponent<CanvasScaler>();
             sc.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            sc.referenceResolution = new Vector2(1600, 900);
+            // telefonda interfeys kattaroq (o'qishga qulay)
+            sc.referenceResolution = Application.isMobilePlatform ? new Vector2(1240, 698) : new Vector2(1600, 900);
             sc.matchWidthOrHeight = 0.6f;
             go.AddComponent<GraphicRaycaster>();
             root = (RectTransform)go.transform;
@@ -76,6 +78,8 @@ namespace CozyCourier
             ovGarage = BuildGarage();
             ovPause = BuildPause();
             ovEnd = BuildEnd();
+            ovShop = BuildShop();
+            Shop.OnResult -= OnShopResult; Shop.OnResult += OnShopResult;
             BuildCut();
         }
 
@@ -90,6 +94,7 @@ namespace CozyCourier
                 case View.Free: OpenFree(); break;
                 case View.Settings: OpenSettings(); break;
                 case View.Help: Open(View.Help, ovHelp); break;
+                case View.Shop: OpenShop(shopFromGarage); break;
                 case View.Garage: ShowGarage(); break;
                 case View.Play: ShowPlay(); break;
                 case View.Pause: ShowPause(); break;
@@ -180,40 +185,53 @@ namespace CozyCourier
             return val;
         }
 
+        /// <summary>
+        /// O'yin paytidagi ixcham yuqori panel: pauza tugmasi, smena vaqti, daromad, shtraf, reyting, daraja.
+        /// (Til va bosh menyu pauza oynasida.)
+        /// </summary>
         void BuildLeft()
         {
-            left = UI.Box(root, UI.Panel, "Left").rectTransform;
-            UI.Place(left, new Vector2(0, 1), new Vector2(0, 1), new Vector2(14, -14), new Vector2(290, 0));
-            UI.VL(left, 12, 8);
-            var fit = left.gameObject.AddComponent<ContentSizeFitter>(); fit.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+            left = UI.Node("TopBar", root);
+            UI.Place(left, new Vector2(0, 1), new Vector2(0, 1), new Vector2(12, -12), new Vector2(0, 58));
+            var hl = left.gameObject.AddComponent<HorizontalLayoutGroup>();
+            hl.spacing = 8; hl.childControlWidth = true; hl.childControlHeight = true; hl.childForceExpandWidth = false; hl.childForceExpandHeight = true;
+            var fit = left.gameObject.AddComponent<ContentSizeFitter>(); fit.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
 
-            Txt(left, "<color=#f4a259>Cozy</color> Courier", 30, UI.Fg, 38, TextAnchor.MiddleLeft, FontStyle.Bold);
-            var row = UI.Node("buttons", left); UI.HL(row, 0, 6); UI.LE(row, 46);
-            UI.Btn(row, Loc.Get("menu"), UI.Panel2, UI.Fg, () => { if (G.state == Game.St.Play) G.SetPause(true); else G.QuitToMenu(); }, 20);
-            UI.Btn(row, Loc.Get("pause"), UI.Panel2, UI.Fg, () => G.SetPause(G.state == Game.St.Play), 20);
-            LangRow(left, 40);
+            var pb = UI.Btn(left, "II", Art.Hex("#101b22", .88f), UI.Fg, () => G.SetPause(G.state == Game.St.Play), 26);
+            UI.LE(pb, 58, 58);
+            tShift = Chip(left, "shift", UI.Fg, 96);
+            tMoney = Chip(left, "income", Art.Hex("#ffcf8a"), 140);
+            tFine = Chip(left, "fines", UI.Soft, 118);
+            tRate = Chip(left, "rating", UI.Gold, 92);
+            tLvl = Chip(left, "level", UI.Teal, 86);
+            var bg = UI.Pic(tLvl.transform.parent, Art.Square, new Color(1, 1, 1, .12f), "xpbg");
+            UI.Place(bg.rectTransform, new Vector2(.5f, 0), new Vector2(.5f, 0), new Vector2(0, 5), new Vector2(60, 4));
+            xpFill = UI.Pic(bg.transform, Art.Square, UI.Teal, "xp");
+            xpFill.type = Image.Type.Filled; xpFill.fillMethod = Image.FillMethod.Horizontal;
+            UI.Fill(xpFill.rectTransform);
+            tTime = UI.Label(left, "", 1, Color.clear); tTime.gameObject.SetActive(false); // soat endi ko'rinmaydi (osmon rangi yetarli)
+        }
 
-            var grid = UI.Node("stats", left);
-            var g = grid.gameObject.AddComponent<GridLayoutGroup>();
-            g.cellSize = new Vector2(129, 66); g.spacing = new Vector2(8, 8);
-            g.constraint = GridLayoutGroup.Constraint.FixedColumnCount; g.constraintCount = 2;
-            UI.LE(grid, 66 * 3 + 16);
-            tTime = Stat(grid, "time", out _);
-            tShift = Stat(grid, "shift", out _);
-            tMoney = Stat(grid, "income", out _);
-            tFine = Stat(grid, "fines", out _); tFine.color = UI.Soft;
-            tRate = Stat(grid, "rating", out _);
-            tLvl = Stat(grid, "level", out xpFill);
+        UText Chip(Transform parent, string key, Color c, float w)
+        {
+            var box = UI.Box(parent, Art.Hex("#101b22", .82f), "chip");
+            UI.LE(box, 58, w);
+            var cap = UI.Label(box.transform, Loc.Get(key).ToUpper(), 12, UI.Muted, TextAnchor.UpperCenter, FontStyle.Bold);
+            UI.Place(cap.rectTransform, new Vector2(.5f, 1), new Vector2(.5f, 1), new Vector2(0, -4), new Vector2(w, 16));
+            cap.horizontalOverflow = HorizontalWrapMode.Overflow;
+            var t = UI.Label(box.transform, "", 25, c, TextAnchor.MiddleCenter, FontStyle.Bold);
+            UI.Place(t.rectTransform, new Vector2(.5f, 0), new Vector2(.5f, 0), new Vector2(0, 7), new Vector2(w, 32));
+            t.horizontalOverflow = HorizontalWrapMode.Overflow;
+            return t;
         }
 
         void BuildRight()
         {
             right = UI.Box(root, UI.Panel, "Right").rectTransform;
-            UI.Place(right, new Vector2(1, 1), new Vector2(1, 1), new Vector2(-14, -14), new Vector2(340, 0));
-            UI.VL(right, 12, 8);
+            UI.Place(right, new Vector2(1, 1), new Vector2(1, 1), new Vector2(-12, -12), new Vector2(330, 0));
+            UI.VL(right, 10, 6);
             var fit = right.gameObject.AddComponent<ContentSizeFitter>(); fit.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-            Txt(right, Loc.Get("orders"), 24, UI.Fg, 32, TextAnchor.MiddleLeft, FontStyle.Bold);
-            tBag = Txt(right, "", 18, UI.Muted, 24);
+            tBag = Txt(right, "", 22, UI.Fg, 30, TextAnchor.MiddleLeft, FontStyle.Bold);
             ordersBox = UI.Node("orders", right);
             UI.VL(ordersBox, 0, 8);
             var fit2 = ordersBox.gameObject.AddComponent<ContentSizeFitter>(); fit2.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
@@ -222,8 +240,8 @@ namespace CozyCourier
         void BuildToast()
         {
             toastBg = UI.Box(root, Art.Hex("#101b22", .92f), "Toast");
-            UI.Place(toastBg.rectTransform, new Vector2(.5f, 1), new Vector2(.5f, 1), new Vector2(0, -16), new Vector2(760, 56));
-            toastTxt = UI.Label(toastBg.transform, "", 22, UI.Fg, TextAnchor.MiddleCenter, FontStyle.Bold);
+            UI.Place(toastBg.rectTransform, new Vector2(.5f, 1), new Vector2(.5f, 1), new Vector2(0, -84), new Vector2(760, 56));
+            toastTxt = UI.Label(toastBg.transform, "", 23, UI.Fg, TextAnchor.MiddleCenter, FontStyle.Bold);
             UI.Fill(toastTxt.rectTransform, 10);
             toastBg.gameObject.SetActive(false);
         }
@@ -283,7 +301,9 @@ namespace CozyCourier
             var r2 = UI.Node("row2", card); UI.HL(r2, 0, 10); UI.LE(r2, 70);
             Big(r2, Loc.Get("garage"), Loc.Get("garageSub"), UI.Panel2, UI.Fg, () => { garageFromEnd = false; ShowGarage(); }, 70);
             Big(r2, Loc.Get("settings"), Loc.Get("settingsSub"), UI.Panel2, UI.Fg, OpenSettings, 70);
-            Big(card, Loc.Get("howto"), Loc.Get("howtoSub"), UI.Panel2, UI.Fg, () => Open(View.Help, ovHelp), 66);
+            var r3 = UI.Node("row3", card); UI.HL(r3, 0, 10); UI.LE(r3, 66);
+            Big(r3, "★ " + Loc.Get("shop"), Save.NoAds ? Loc.Get("noAdsBadge") : Loc.Get("shopSub"), UI.Gold, Dark, () => OpenShop(false), 66);
+            Big(r3, Loc.Get("howto"), Loc.Get("howtoSub"), UI.Panel2, UI.Fg, () => Open(View.Help, ovHelp), 66);
             return ov;
         }
 
@@ -336,6 +356,7 @@ namespace CozyCourier
             Toggle(card, "sfx", () => Save.Sfx, v => { Save.Sfx = v; G.sfx.Chime(880, .2f); });
             Row(card, Loc.Get("resetStory"), Loc.Get("restart"), () => { Save.Chapter = 0; setToast.text = Loc.Get("storyReset"); });
             Row(card, Loc.Get("resetAll"), Loc.Get("erase"), () => confirmBox.gameObject.SetActive(true));
+            if (Ads.PrivacyRequired) Row(card, Loc.Get("privacy"), "›", Ads.ShowPrivacy);
             var cb = UI.Box(card, Art.Hex("#3a2a24"), "confirm");
             confirmBox = cb.rectTransform;
             UI.VL(cb, 14, 8);
@@ -410,12 +431,13 @@ namespace CozyCourier
             var ht = UI.Label(head, Loc.Get("garageTitle"), 32, UI.Fg, TextAnchor.MiddleLeft, FontStyle.Bold); UI.LE(ht, -1, -1, 3);
             gWallet = UI.Label(head, "", 20, Art.Hex("#ffcf8a"), TextAnchor.MiddleRight, FontStyle.Bold); UI.LE(gWallet, -1, -1, 2);
             gLvl = UI.Label(head, "", 20, UI.Teal, TextAnchor.MiddleRight, FontStyle.Bold); UI.LE(gLvl, -1, -1, 1);
+            var shb = UI.Btn(head, "★ " + Loc.Get("shop"), UI.Gold, Dark, () => OpenShop(true), 19); UI.LE(shb, 44, 150);
             gTabs = UI.Node("tabs", card); UI.HL(gTabs, 0, 8); UI.LE(gTabs, 46);
 
             // aylantiriladigan ro'yxat
             var sv = UI.Box(card, new Color(0, 0, 0, .15f), "scroll");
             sv.raycastTarget = true;
-            UI.LE(sv, 470);
+            UI.LE(sv, 420);
             sv.gameObject.AddComponent<RectMask2D>();
             var sr = sv.gameObject.AddComponent<ScrollRect>();
             sr.horizontal = false; sr.movementType = ScrollRect.MovementType.Clamped; sr.scrollSensitivity = 30;
@@ -429,6 +451,8 @@ namespace CozyCourier
             var gf = gItems.gameObject.AddComponent<ContentSizeFitter>(); gf.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
             sr.content = gItems; sr.viewport = sv.rectTransform;
 
+            gAdBtn = UI.Btn(card, "", Art.Hex("#2a434e"), UI.Gold, OnAdCoins, 19); UI.LE(gAdBtn, 46);
+            gAdBtnLbl = gAdBtn.GetComponentInChildren<UText>();
             gToast = Txt(card, "", 18, UI.Ok, 26);
             BackBtn(card, GarageBack);
             return ov;
@@ -450,6 +474,7 @@ namespace CozyCourier
         void RenderGarage()
         {
             gWallet.text = Loc.Money(Save.Wallet);
+            UpdateAdBtn();
             gLvl.text = Loc.Get("level") + " " + Save.Level;
             Clear(gTabs);
             string[] tabs = { "up", "look", "reno" }, names = { "tabUp", "tabLook", "tabReno" };
@@ -489,11 +514,13 @@ namespace CozyCourier
                         string btn; bool can; int style;
                         if (on) { btn = Loc.Get("equipped"); can = false; style = 2; }
                         else if (owned) { btn = Loc.Get("equip"); can = true; style = 1; }
+                        else if (it.vip) { btn = "★ " + Loc.Get("vipOnly"); can = true; style = 0; }
                         else if (locked) { btn = Loc.Get("atLevel", it.lvl); can = false; style = 0; }
                         else { btn = Loc.Money(it.price); can = W >= it.price; style = 0; }
                         string c = cat; var ii = it;
                         Item(Art.Hex(it.c0), it.ikat ? (Color?)null : Art.Hex(it.c1), Loc.Tx(it.name), Loc.Tx(Data.LookTitle[cat]), -1, 0, btn, can, style, () =>
                         {
+                            if (ii.vip && !Save.Owned(c, ii.id)) { OpenShop(true); return; }
                             if (Save.Owned(c, ii.id)) { Save.Equip(c, ii.id); G.sfx.Chime(660, .2f); }
                             else
                             {
@@ -565,6 +592,119 @@ namespace CozyCourier
             var cb = b.colors; cb.disabledColor = new Color(1, 1, 1, 1); b.colors = cb;
         }
 
+        // ---------------------------------------------------------------- do'kon (pullik xizmatlar)
+        RectTransform BuildShop()
+        {
+            var ov = Overlay("Shop", out var card, 820);
+            var head = UI.Node("head", card); UI.HL(head, 0, 10); UI.LE(head, 46);
+            var ht = UI.Label(head, Loc.Get("shopTitle"), 30, UI.Fg, TextAnchor.MiddleLeft, FontStyle.Bold); UI.LE(ht, -1, -1, 3);
+            shopWallet = UI.Label(head, "", 20, Art.Hex("#ffcf8a"), TextAnchor.MiddleRight, FontStyle.Bold); UI.LE(shopWallet, -1, -1, 2);
+
+            var sv = UI.Box(card, new Color(0, 0, 0, .15f), "scroll");
+            sv.raycastTarget = true;
+            UI.LE(sv, 380);
+            sv.gameObject.AddComponent<RectMask2D>();
+            var sr = sv.gameObject.AddComponent<ScrollRect>();
+            sr.horizontal = false; sr.movementType = ScrollRect.MovementType.Clamped; sr.scrollSensitivity = 30;
+            shopItems = UI.Node("items", sv.transform);
+            shopItems.anchorMin = new Vector2(0, 1); shopItems.anchorMax = new Vector2(1, 1); shopItems.pivot = new Vector2(.5f, 1);
+            shopItems.offsetMin = Vector2.zero; shopItems.offsetMax = Vector2.zero;
+            var vl = shopItems.gameObject.AddComponent<VerticalLayoutGroup>();
+            vl.padding = new RectOffset(10, 10, 10, 10); vl.spacing = 8; vl.childControlHeight = true; vl.childControlWidth = true; vl.childForceExpandHeight = false;
+            var f = shopItems.gameObject.AddComponent<ContentSizeFitter>(); f.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+            sr.content = shopItems; sr.viewport = sv.rectTransform;
+
+            Txt(card, Loc.Get("shopNote"), 15, UI.Muted, 22);
+            shopToast = Txt(card, "", 18, UI.Ok, 24);
+            var row = UI.Node("row", card); UI.HL(row, 0, 10); UI.LE(row, 50);
+            UI.Btn(row, Loc.Get("restore"), UI.Panel2, UI.Fg, () => { shopToast.text = "…"; Shop.Restore(); }, 19);
+            UI.Btn(row, "← " + Loc.Get("back"), UI.Panel2, UI.Fg, ShopBack, 20);
+            return ov;
+        }
+
+        void OpenShop(bool fromGarage)
+        {
+            shopFromGarage = fromGarage;
+            Open(View.Shop, ovShop);
+            shopToast.text = Shop.Ready ? "" : Loc.Get("storeOff");
+            RenderShop();
+        }
+
+        void ShopBack()
+        {
+            if (shopFromGarage) { Open(View.Garage, ovGarage); gToast.text = ""; RenderGarage(); }
+            else ShowMenu();
+        }
+
+        void RenderShop()
+        {
+            shopWallet.text = Loc.Money(Save.Wallet);
+            Clear(shopItems);
+            foreach (var it in Shop.Items)
+            {
+                bool owned = Shop.Owned(it.id) || (it.id == Shop.NO_ADS && Save.Vip);
+                var box = UI.Box(shopItems, new Color(1, 1, 1, it.id == Shop.VIP ? .09f : .05f), "item");
+                UI.LE(box, 96);
+                var sw = UI.Box(box.transform, Art.Hex(it.color), "sw");
+                UI.Place(sw.rectTransform, new Vector2(0, .5f), new Vector2(0, .5f), new Vector2(14, 0), new Vector2(58, 58));
+                var ic = UI.Label(sw.transform, it.consumable ? "+" : it.id == Shop.VIP ? "★" : "×", 30, Art.Hex("#14222a"), TextAnchor.MiddleCenter, FontStyle.Bold);
+                UI.Fill(ic.rectTransform);
+                var t = UI.Label(box.transform, Loc.Get(it.nameKey) + (it.consumable ? "  <color=#ffcf8a>+" + Loc.Money(it.coins) + "</color>" : ""), 22, UI.Fg, TextAnchor.UpperLeft, FontStyle.Bold);
+                UI.Place(t.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(86, -12), new Vector2(520, 30));
+                t.horizontalOverflow = HorizontalWrapMode.Overflow;
+                var d = UI.Label(box.transform, Loc.Get(it.descKey, Loc.Money(it.coins)), 16, UI.Muted, TextAnchor.UpperLeft);
+                UI.Place(d.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(86, -44), new Vector2(520, 44));
+                string id = it.id;
+                var b = UI.Btn(box.transform, owned ? "✓ " + Loc.Get("owned") : Shop.Price(it), owned ? UI.Teal : UI.Accent, owned ? Art.Hex("#06231f") : Dark, () =>
+                {
+                    shopToast.text = "…";
+                    G.sfx.Chime(660, .15f);
+                    Shop.Buy(id);
+                }, 20);
+                UI.Place((RectTransform)b.transform, new Vector2(1, .5f), new Vector2(1, .5f), new Vector2(-14, 0), new Vector2(150, 50));
+                b.interactable = !owned;
+                var cb = b.colors; cb.disabledColor = Color.white; b.colors = cb;
+            }
+        }
+
+        void OnShopResult(string id, bool ok)
+        {
+            if (root == null) return;
+            string name = "";
+            foreach (var it in Shop.Items) if (it.id == id) name = Loc.Get(it.nameKey);
+            if (shopToast != null)
+            {
+                shopToast.text = string.IsNullOrEmpty(id) ? (ok ? Loc.Get("restored") : Loc.Get("storeOff")) : ok ? Loc.Get("buyOk", name) : Loc.Get("buyFail");
+                shopToast.color = ok ? UI.Ok : UI.Soft;
+            }
+            if (ok)
+            {
+                G.sfx.Arp(523, 659, 784);
+                G.ApplyLook();
+                if (view == View.Shop) RenderShop();
+            }
+        }
+
+        void OnAdCoins()
+        {
+            gAdBtn.interactable = false;
+            Ads.ShowRewardedCoins(ok =>
+            {
+                if (ok) { gToast.text = Loc.Get("adCoinsOk", Loc.Money(Ads.AD_COINS)); G.sfx.Chime(988, .3f); string keep = gToast.text; RenderGarage(); gToast.text = keep; }
+                else gToast.text = Loc.Get("adFail");
+                UpdateAdBtn();
+            });
+        }
+
+        void UpdateAdBtn()
+        {
+            if (gAdBtn == null) return;
+            int wait = Ads.CoinsWait;
+            bool can = wait == 0 && Ads.RewardReady;
+            gAdBtn.interactable = can;
+            gAdBtnLbl.text = wait > 0 ? Loc.Get("adWait", wait) : (Save.NoAds ? "★ " : "▶ ") + Loc.Get("adCoins", Loc.Money(Ads.AD_COINS));
+        }
+
         // ---------------------------------------------------------------- pauza va yakun
         RectTransform BuildPause()
         {
@@ -572,6 +712,7 @@ namespace CozyCourier
             Txt(card, Loc.Get("pause").ToUpper(), 17, UI.Gold, 24, TextAnchor.MiddleLeft, FontStyle.Bold);
             Txt(card, Loc.Get("pauseTitle"), 34, UI.Fg, 44, TextAnchor.MiddleLeft, FontStyle.Bold);
             Txt(card, Loc.Get("pauseText"), 20, UI.Muted, 56);
+            LangRow(card, 46);
             var row = UI.Node("row", card); UI.HL(row, 0, 10); UI.LE(row, 60);
             UI.Btn(row, Loc.Get("resume"), UI.Accent, Dark, () => G.SetPause(false), 24);
             UI.Btn(row, Loc.Get("menu"), UI.Panel2, UI.Fg, () => G.QuitToMenu(), 24);
@@ -586,7 +727,7 @@ namespace CozyCourier
             endMoney = Txt(card, "", 48, Art.Hex("#ffcf8a"), 60, TextAnchor.MiddleLeft, FontStyle.Bold);
             endInfo = Txt(card, "", 18, UI.Muted, 108);
             endUnlock = Txt(card, "", 18, UI.Teal, -1);
-            endDouble = UI.Btn(card, "▶  " + Loc.Get("double"), UI.Gold, Dark, OnDouble, 21); UI.LE(endDouble, 54);
+            endDouble = UI.Btn(card, Save.NoAds ? "★  " + Loc.Get("doubleFree") : "▶  " + Loc.Get("double"), UI.Gold, Dark, OnDouble, 21); UI.LE(endDouble, 54);
             endToast = Txt(card, "", 18, UI.Ok, 24);
             var row = UI.Node("row", card); UI.HL(row, 0, 10); UI.LE(row, 60);
             endNext = UI.Btn(row, "", UI.Accent, Dark, () => G.AfterEnd(), 22);
@@ -756,7 +897,7 @@ namespace CozyCourier
         // ========================= KO'RSATISH =========================
         void HideAll()
         {
-            foreach (var o in new[] { ovMenu, ovFree, ovSettings, ovHelp, ovGarage, ovPause, ovEnd }) o.gameObject.SetActive(false);
+            foreach (var o in new[] { ovMenu, ovFree, ovSettings, ovHelp, ovGarage, ovPause, ovEnd, ovShop }) if (o != null) o.gameObject.SetActive(false);
         }
 
         void SetHud(bool on)
@@ -778,6 +919,7 @@ namespace CozyCourier
         public void Back()
         {
             if (view == View.Garage) GarageBack();
+            else if (view == View.Shop) ShopBack();
             else if (view == View.Free || view == View.Settings || view == View.Help) ShowMenu();
             else if (view == View.End) G.EndToMenu();
         }
@@ -824,6 +966,105 @@ namespace CozyCourier
             endDouble.interactable = true;
         }
 
+        // ========================= OCHILISH EKRANI =========================
+        /// <summary>O'yin ochilganda: kechki Toshkent, sakrab chiqadigan quti, nom va yuklanish chizig'i.</summary>
+        public void ShowSplash()
+        {
+            var bgTex = Resources.Load<Texture2D>("cozy_splash_bg");
+            var logoTex = Resources.Load<Texture2D>("cozy_logo");
+            var sp = UI.Node("Splash", root); UI.Fill(sp);
+            var cg = sp.gameObject.AddComponent<CanvasGroup>();
+
+            var solid = UI.Pic(sp, Art.Square, Art.Hex("#3e3466"), "solid"); UI.Fill(solid.rectTransform);
+            solid.raycastTarget = true;
+            RawImage bg = null;
+            if (bgTex != null)
+            {
+                bg = UI.Node("bg", sp).gameObject.AddComponent<RawImage>();
+                bg.texture = bgTex; bg.raycastTarget = false; UI.Fill(bg.rectTransform);
+            }
+            var glow = UI.Pic(sp, Art.Soft, new Color(1, .9f, .7f, .55f), "glow");
+            UI.Place(glow.rectTransform, new Vector2(.5f, .5f), new Vector2(.5f, .5f), new Vector2(0, 60), new Vector2(760, 760));
+            RawImage logo = null;
+            if (logoTex != null)
+            {
+                logo = UI.Node("logo", sp).gameObject.AddComponent<RawImage>();
+                logo.texture = logoTex; logo.raycastTarget = false;
+                UI.Place(logo.rectTransform, new Vector2(.5f, .5f), new Vector2(.5f, .5f), new Vector2(0, 90), new Vector2(430, 430));
+            }
+            var title = UI.Label(sp, "Cozy <color=#ffc98a>Courier</color>", 84, Art.Hex("#fff6e8"), TextAnchor.MiddleCenter, FontStyle.Bold);
+            UI.Place(title.rectTransform, new Vector2(.5f, .5f), new Vector2(.5f, .5f), new Vector2(0, -175), new Vector2(1200, 110));
+            var shadow = title.gameObject.AddComponent<Shadow>(); shadow.effectColor = new Color(.16f, .08f, .2f, .45f); shadow.effectDistance = new Vector2(0, -5);
+            var sub = UI.Label(sp, Loc.Get("tagline").ToUpper(), 24, UI.Gold, TextAnchor.MiddleCenter, FontStyle.Bold);
+            UI.Place(sub.rectTransform, new Vector2(.5f, .5f), new Vector2(.5f, .5f), new Vector2(0, -245), new Vector2(1200, 36));
+            var barBg = UI.Pic(sp, Art.Round, new Color(1, 1, 1, .18f), "barBg"); barBg.type = Image.Type.Sliced; barBg.pixelsPerUnitMultiplier = 4;
+            UI.Place(barBg.rectTransform, new Vector2(.5f, 0), new Vector2(.5f, 0), new Vector2(0, 70), new Vector2(360, 10));
+            var bar = UI.Pic(barBg.transform, Art.Round, UI.Accent, "bar"); bar.type = Image.Type.Sliced; bar.pixelsPerUnitMultiplier = 4;
+            bar.rectTransform.anchorMin = Vector2.zero; bar.rectTransform.anchorMax = new Vector2(0, 1); bar.rectTransform.pivot = new Vector2(0, .5f);
+            bar.rectTransform.offsetMin = Vector2.zero; bar.rectTransform.offsetMax = Vector2.zero;
+            var btn = solid.gameObject.AddComponent<Button>(); btn.transition = Selectable.Transition.None;
+
+            var s = sp.gameObject.AddComponent<SplashAnim>();
+            s.Init(cg, bg, glow, logo, title, sub, bar.rectTransform, barBg.rectTransform);
+            btn.onClick.AddListener(s.Skip);
+            sp.SetAsLastSibling();
+        }
+
+        /// <summary>Ochilish ekrani animatsiyasi (o'zi o'chadi).</summary>
+        class SplashAnim : MonoBehaviour
+        {
+            CanvasGroup cg; RawImage bg, logo; Image glow; UText title, sub; RectTransform bar, barBg;
+            float t; bool closing; float closeT;
+            const float LEN = 2.4f;
+
+            public void Init(CanvasGroup c, RawImage b, Image g, RawImage l, UText ti, UText su, RectTransform br, RectTransform bb)
+            { cg = c; bg = b; glow = g; logo = l; title = ti; sub = su; bar = br; barBg = bb; Apply(); }
+
+            public void Skip() { if (t > .5f && !closing) { closing = true; closeT = 0; } }
+
+            void Update()
+            {
+                float dt = Mathf.Min(Time.unscaledDeltaTime, .05f);
+                t += dt;
+                if (!closing && t >= LEN) { closing = true; closeT = 0; }
+                if (closing)
+                {
+                    closeT += dt;
+                    cg.alpha = 1 - Mathf.Clamp01(closeT / .45f);
+                    if (closeT >= .45f) { Destroy(gameObject); return; }
+                }
+                Apply();
+            }
+
+            static float Back(float x) { x = Mathf.Clamp01(x); float c = 1.7f; return 1 + (c + 1) * Mathf.Pow(x - 1, 3) + c * Mathf.Pow(x - 1, 2); }
+
+            void Apply()
+            {
+                // fon: rasmni ekranga "cover" qilib, pastdagi shaharni ko'rsatamiz
+                if (bg != null)
+                {
+                    var r = ((RectTransform)transform).rect;
+                    float aspect = r.height > 0 ? r.width / r.height : 1.78f;
+                    float h = aspect >= 1 ? 1f / aspect : 1f, w = aspect >= 1 ? 1f : aspect;
+                    bg.uvRect = new Rect((1 - w) / 2, Mathf.Lerp(.08f, 0, Mathf.Clamp01(t / LEN)), w, h);
+                }
+                float pop = Back(t / .7f);
+                if (logo != null)
+                {
+                    logo.rectTransform.localScale = Vector3.one * Mathf.Max(0, pop);
+                    logo.rectTransform.anchoredPosition = new Vector2(0, 90 + Mathf.Sin(t * 2.2f) * 8);
+                    logo.color = new Color(1, 1, 1, Mathf.Clamp01(t / .25f));
+                }
+                glow.color = new Color(1, .9f, .7f, .55f * Mathf.Clamp01(t / .6f) * (.85f + .15f * Mathf.Sin(t * 3f)));
+                float ta = Mathf.Clamp01((t - .45f) / .5f);
+                title.color = new Color(1, .965f, .91f, ta);
+                title.rectTransform.anchoredPosition = new Vector2(0, -175 - (1 - ta) * 20);
+                sub.color = Art.A(UI.Gold, Mathf.Clamp01((t - .8f) / .5f));
+                float load = Mathf.SmoothStep(0, 1, Mathf.Clamp01((t - .3f) / (LEN - .5f)));
+                bar.sizeDelta = new Vector2(barBg.rect.width * load, 0);
+            }
+        }
+
         // ========================= XABAR =========================
         public void Toast(string s, Color c)
         {
@@ -868,6 +1109,7 @@ namespace CozyCourier
                 }
             }
 
+            if (view == View.Garage && Time.frameCount % 30 == 0) UpdateAdBtn();
             if (view == View.Play) Markers();
             else if (markers.gameObject.activeSelf) foreach (var m in markerPool) m.gameObject.SetActive(false);
         }
@@ -930,7 +1172,7 @@ namespace CozyCourier
 
             int inBag = 0;
             foreach (var o in G.orders) if (o.picked) inBag++;
-            tBag.text = Loc.Get("bag") + ": " + inBag + " / " + G.bagMax;
+            tBag.text = Loc.Get("orders") + "  <size=18><color=#94a9ac>" + Loc.Get("bag") + " " + inBag + "/" + G.bagMax + "</color></size>";
 
             Clear(ordersBox);
             if (G.orders.Count == 0) { Txt(ordersBox, Loc.Get("waiting"), 18, UI.Muted, 60, TextAnchor.MiddleCenter); return; }
@@ -942,11 +1184,11 @@ namespace CozyCourier
         void OrderRow(Order o)
         {
             var row = UI.Box(ordersBox, o.story ? new Color(1, .82f, .4f, .1f) : new Color(1, 1, 1, .05f), "order");
-            UI.LE(row, 70);
+            UI.LE(row, 78);
             var num = UI.Pic(row.transform, o.picked ? Art.Round : Art.Circle, o.color, "num");
             if (o.picked) num.type = Image.Type.Sliced;
-            UI.Place(num.rectTransform, new Vector2(0, .5f), new Vector2(0, .5f), new Vector2(10, 4), new Vector2(36, 36));
-            var nt = UI.Label(num.transform, o.story ? "★" : o.id.ToString(), 18, Art.Hex("#14222a"), TextAnchor.MiddleCenter, FontStyle.Bold);
+            UI.Place(num.rectTransform, new Vector2(0, .5f), new Vector2(0, .5f), new Vector2(10, 4), new Vector2(40, 40));
+            var nt = UI.Label(num.transform, o.story ? "★" : o.id.ToString(), 21, Art.Hex("#14222a"), TextAnchor.MiddleCenter, FontStyle.Bold);
             UI.Fill(nt.rectTransform);
 
             bool inf = float.IsInfinity(o.limit);
@@ -956,14 +1198,14 @@ namespace CozyCourier
             Color chipC = o.story ? UI.Gold : o.late ? UI.Soft : o.picked ? UI.Accent : UI.Ok;
             string where = o.picked ? o.house.Label : Loc.Tx(o.rest.rest.name);
 
-            var t1 = UI.Label(row.transform, "<b>" + where + "</b>  <size=13><color=" + UI.Hex(chipC) + ">" + chip + "</color></size>", 19, UI.Fg, TextAnchor.MiddleLeft);
-            UI.Place(t1.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(56, -8), new Vector2(210, 26));
+            var t1 = UI.Label(row.transform, "<b>" + where + "</b>  <size=15><color=" + UI.Hex(chipC) + ">" + chip + "</color></size>", 22, UI.Fg, TextAnchor.MiddleLeft);
+            UI.Place(t1.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(60, -8), new Vector2(200, 30));
             t1.horizontalOverflow = HorizontalWrapMode.Overflow;
-            var t2 = UI.Label(row.transform, o.DishName + " → " + o.house.Label, 15, UI.Muted, TextAnchor.MiddleLeft);
-            UI.Place(t2.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(56, -34), new Vector2(220, 22));
+            var t2 = UI.Label(row.transform, o.DishName + " → " + o.house.Label, 17, UI.Muted, TextAnchor.MiddleLeft);
+            UI.Place(t2.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(60, -38), new Vector2(200, 24));
             t2.horizontalOverflow = HorizontalWrapMode.Overflow;
             string secT = inf ? "∞" : o.late ? "+" + Mathf.CeilToInt(-o.left) + "s" : Mathf.CeilToInt(o.left) + "s";
-            var sec = UI.Label(row.transform, secT, 19, bc, TextAnchor.MiddleRight, FontStyle.Bold);
+            var sec = UI.Label(row.transform, secT, 23, bc, TextAnchor.MiddleRight, FontStyle.Bold);
             UI.Place(sec.rectTransform, new Vector2(1, .5f), new Vector2(1, .5f), new Vector2(-10, 4), new Vector2(70, 30));
 
             var barBg = UI.Pic(row.transform, Art.Square, new Color(1, 1, 1, .08f), "barbg");

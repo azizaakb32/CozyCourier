@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: 856698c127a13d841bc82a6894c6473d
+guid: 21b74527d26ea414c89913c4a29a7885
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: 8649127360083827864
-    second: adaptive_background_0
+      213: 5675436815048026244
+    second: cozy_splash_bg_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -126,7 +126,7 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: adaptive_background_0
+      name: cozy_splash_bg_0
       rect:
         serializedVersion: 2
         x: 0
@@ -141,8 +141,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: 89c98ea428fd70870800000000000000
-      internalID: 8649127360083827864
+      spriteID: 488ac1aa6b333ce40800000000000000
+      internalID: 5675436815048026244
       vertices: []
       indices: 
       edges: []

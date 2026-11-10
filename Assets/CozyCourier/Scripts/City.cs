@@ -231,6 +231,372 @@ namespace CozyCourier
             Art.MeshObj(root, "Ground", mb.Build(), 0);
         }
 
+        // ================================================================ chizish yordamchilari
+        // Old devor (janub): u — chapdan, z — yerdan balandlik (piksel)
+        static Vector2 F(float x, float y, float d, float u, float z) => new Vector2(x + u + z * Art.OX, y + d + z * Art.OY);
+        // Yon devor (sharq): t — yuqoridan pastga, z — balandlik
+        static Vector2 E(float x, float y, float w, float t, float z) => new Vector2(x + w + z * Art.OX, y + t + z * Art.OY);
+
+        static void FRect(MB mb, float x, float y, float d, float u0, float z0, float u1, float z1, Color c) =>
+            mb.Quad(F(x, y, d, u0, z0), F(x, y, d, u1, z0), F(x, y, d, u1, z1), F(x, y, d, u0, z1), c);
+        static void ERect(MB mb, float x, float y, float w, float t0, float z0, float t1, float z1, Color c) =>
+            mb.Quad(E(x, y, w, t0, z0), E(x, y, w, t1, z0), E(x, y, w, t1, z1), E(x, y, w, t0, z1), c);
+
+        /// <summary>Old devordagi deraza: rom, oyna, yorug' bo'lsa parda va nur.</summary>
+        static void Window(MB mb, MB glow, float x, float y, float d, float u, float z, float ww, float wh, Color frame, bool lit, int seed)
+        {
+            FRect(mb, x, y, d, u - 1.5f, z - 1.5f, u + ww + 1.5f, z + wh + 1.5f, frame);
+            var gl = lit ? Art.Hex("#ffe1a1") : Art.Hex("#5a6f84");
+            FRect(mb, x, y, d, u, z, u + ww, z + wh, gl);
+            if (lit)
+            {
+                // parda
+                var cur = (seed % 3) switch { 0 => Art.Hex("#e8a05c"), 1 => Art.Hex("#d9734a"), _ => Art.Hex("#f2c25a") };
+                FRect(mb, x, y, d, u, z, u + ww * .28f, z + wh, Art.A(cur, .85f));
+                FRect(mb, x, y, d, u + ww * .72f, z, u + ww, z + wh, Art.A(cur, .85f));
+                var a = F(x, y, d, u, z); var b2 = F(x, y, d, u + ww, z + wh);
+                glow.Quad(F(x, y, d, u, z), F(x, y, d, u + ww, z), F(x, y, d, u + ww, z + wh), F(x, y, d, u, z + wh), Art.Hex("#ffd48a"));
+                glow.Circle((a.x + b2.x) / 2, (a.y + b2.y) / 2, ww * 1.4f, new Color(1f, .78f, .47f, .16f), 10);
+            }
+            else FRect(mb, x, y, d, u + 1, z + wh * .55f, u + ww * .45f, z + wh - 1, new Color(1, 1, 1, .22f)); // aks
+            FRect(mb, x, y, d, u + ww / 2 - .5f, z, u + ww / 2 + .5f, z + wh, frame); // o'rta rom
+        }
+
+        /// <summary>Yon devordagi deraza (qiya).</summary>
+        static void SideWindow(MB mb, float x, float y, float w, float t, float z, float tw, float wh, Color frame, bool lit)
+        {
+            ERect(mb, x, y, w, t - 1, z - 1, t + tw + 1, z + wh + 1, frame);
+            ERect(mb, x, y, w, t, z, t + tw, z + wh, lit ? Art.Hex("#f0c98a") : Art.Hex("#4b5d70"));
+        }
+
+        /// <summary>O'zbekcha naqshli bezak chizig'i (girih uslubida rombchalar).</summary>
+        static void Ornament(MB mb, float x, float y, float d, float u0, float u1, float z, Color band, Color a, Color b)
+        {
+            FRect(mb, x, y, d, u0, z, u1, z + 6, band);
+            int n = Mathf.Max(1, Mathf.FloorToInt((u1 - u0) / 7f));
+            float step = (u1 - u0) / n;
+            for (int i = 0; i < n; i++)
+            {
+                float cu = u0 + step * (i + .5f);
+                mb.Poly(new[] { F(x, y, d, cu, z + .8f), F(x, y, d, cu + 2.6f, z + 3), F(x, y, d, cu, z + 5.2f), F(x, y, d, cu - 2.6f, z + 3) }, i % 2 == 0 ? a : b);
+            }
+        }
+
+        static void Planter(MB mb, float px, float py, int seed)
+        {
+            mb.Ellipse(px + 3, py + 2, 6, 2.5f, new Color(.08f, .11f, .16f, .2f));
+            mb.Poly(new[] { new Vector2(px - 5, py - 8), new Vector2(px + 5, py - 8), new Vector2(px + 4, py), new Vector2(px - 4, py) }, Art.Hex("#b8622a"));
+            mb.Rect(px - 5.5f, py - 9, 11, 2, Art.Hex("#c97434"));
+            string[] fl = { "#ee9583", "#ffd166", "#c3a6e8", "#ff8fa3" };
+            mb.Circle(px - 3, py - 12, 4, Art.Hex("#5f9a58"), 8); mb.Circle(px + 3, py - 12, 4, Art.Hex("#4e8250"), 8); mb.Circle(px, py - 15, 4, Art.Hex("#69a064"), 8);
+            for (int i = 0; i < 3; i++) mb.Circle(px - 3 + i * 3, py - 14 + (i % 2) * 2, 1.6f, Art.Hex(fl[(seed + i) % 4]), 6);
+        }
+
+        // ================================================================ restoran
+        void DrawRest(MB mb, MB glow, Block b, int seed)
+        {
+            float x0 = b.x0, y0 = b.y0;
+            float x = x0 + 18, y = y0 + 20, w = BS - 40, d = BS - 50, h = 32;
+            string id = b.rest != null ? b.rest.id : "";
+            var wall = id == "choyxona" ? Art.Hex("#efe0c4") : id == "shashlik" ? Art.Hex("#e9d2b8") : Art.Hex("#f4e9d6");
+            var trim = Art.Shade(b.color, -.15f);
+
+            // yerdagi terassa plitkasi
+            mb.RRect(x - 6, y + d - 4, w + 12, BS - (y - y0) - d + 2, 4, Art.Hex("#d9c9ad"));
+            for (float tx = x - 4; tx < x + w + 6; tx += 9) mb.Rect(tx, y + d - 2, .8f, BS - (y - y0) - d - 2, new Color(0, 0, 0, .06f));
+
+            mb.Box(x, y, w, d, h, wall, Art.Shade(wall, .06f));
+            // poydevor va yuqori karniz
+            FRect(mb, x, y, d, 0, 0, w, 4, Art.Shade(wall, -.25f));
+            FRect(mb, x, y, d, -1, h - 4, w + 1, h, trim);
+            ERect(mb, x, y, w, 0, h - 4, d, h, Art.Shade(trim, -.2f));
+            Ornament(mb, x, y, d, 3, w - 3, h - 11, Art.Hex("#f3e3b3"), Art.Hex("#2f9e92"), Art.Hex("#3d7fd0"));
+
+            // katta vitrinalar (ichida stol siluetlari) va o'rtada eshik
+            float doorU = w / 2 - 7;
+            float[] wins = { 5, doorU + 18 };
+            foreach (float wu in wins)
+            {
+                float ww = doorU - 9;
+                FRect(mb, x, y, d, wu - 2, 4, wu + ww + 2, 22, trim);
+                FRect(mb, x, y, d, wu, 6, wu + ww, 20, Art.Hex("#ffdca0"));
+                glow.Quad(F(x, y, d, wu, 6), F(x, y, d, wu + ww, 6), F(x, y, d, wu + ww, 20), F(x, y, d, wu, 20), new Color(1f, .85f, .55f, .95f));
+                for (int k = 0; k < 2; k++)
+                {
+                    float tu = wu + 4 + k * (ww / 2);
+                    FRect(mb, x, y, d, tu, 6, tu + 6, 9, Art.Hex("#8a5a3a"));        // stol
+                    FRect(mb, x, y, d, tu + 1.5f, 9, tu + 4.5f, 13, Art.Hex("#c98a4b", .7f)); // odam siluet
+                }
+                FRect(mb, x, y, d, wu + 1, 15, wu + ww * .4f, 19, new Color(1, 1, 1, .28f));
+            }
+            // eshik
+            FRect(mb, x, y, d, doorU - 2, 0, doorU + 16, 24, trim);
+            FRect(mb, x, y, d, doorU, 0, doorU + 14, 22, Art.Hex("#7a4a2c"));
+            FRect(mb, x, y, d, doorU + 2, 10, doorU + 12, 20, Art.Hex("#ffd9a0"));
+            var dk = F(x, y, d, doorU + 11, 9); mb.Circle(dk.x, dk.y, 1.2f, Art.Hex("#e9c46a"), 6);
+            // soyabon (yo'l-yo'l, to'lqinli cheti)
+            int seg = 8;
+            for (int i = 0; i < seg; i++)
+            {
+                var a = F(x, y, d, i * w / seg, 25); var e = F(x, y, d, (i + 1) * w / seg, 25);
+                var col = i % 2 == 1 ? Art.Hex("#fff8ec") : b.color;
+                mb.Quad(a, e, new Vector2(e.x + 1, e.y + 10), new Vector2(a.x + 1, a.y + 10), col);
+                mb.Arc((a.x + e.x) / 2 + 1, a.y + 10, (e.x - a.x) / 2, 3, 0, Mathf.PI, col, 6);
+            }
+            // soyabon chetidagi chiroqchalar
+            for (int i = 0; i <= 10; i++)
+            {
+                var p = F(x, y, d, i * w / 10, 23);
+                var lc = (i % 3) switch { 0 => Art.Hex("#ffd166"), 1 => Art.Hex("#ff9f6e"), _ => Art.Hex("#fff3c4") };
+                mb.Circle(p.x + 1, p.y + 13 + Mathf.Sin(i * .9f) * 1.2f, 1.2f, lc, 6);
+                glow.Circle(p.x + 1, p.y + 13 + Mathf.Sin(i * .9f) * 1.2f, 3.2f, Art.A(lc, .8f), 8);
+            }
+
+            // tom: parapet, konditsioner, o'simlik
+            float rx = x + h * Art.OX, ry = y + h * Art.OY;
+            var edge = Art.Shade(wall, -.12f);
+            mb.Rect(rx, ry, w, 3, edge); mb.Rect(rx, ry + d - 3, w, 3, edge); mb.Rect(rx, ry, 3, d, edge); mb.Rect(rx + w - 3, ry, 3, d, edge);
+            mb.Box(rx + w - 22, ry + 8, 14, 10, 6, Art.Hex("#c9ced2"), null, false);
+            mb.Circle(rx + w - 15 + 6 * Art.OX, ry + 13 + 6 * Art.OY, 3, Art.Hex("#8e9aa3"), 8);
+
+            if (id == "shashlik")
+            {
+                // mo'ri (tutun chiqadigan)
+                mb.Box(rx + 10, ry + 10, 8, 8, 14, Art.Hex("#8a5a3a"), Art.Hex("#3a2a20"), false);
+                // eshik oldida mangal
+                float mx = x + w - 6, my = y0 + BS - 10;
+                mb.Ellipse(mx + 3, my + 2, 14, 3, new Color(.08f, .11f, .16f, .25f));
+                mb.Box(mx - 14, my - 6, 26, 6, 9, Art.Hex("#3a3a3a"), Art.Hex("#262626"), false);
+                for (int i = 0; i < 5; i++) { mb.Rect(mx - 12 + i * 5 + 9 * Art.OX, my - 6 + 9 * Art.OY + 1, 3, 4, Art.Hex("#ff7a3d")); }
+                glow.Circle(mx - 2 + 9 * Art.OX, my - 3 + 9 * Art.OY, 14, new Color(1f, .5f, .2f, .5f), 12);
+                for (int i = 0; i < 4; i++) mb.Rect(mx - 13 + 9 * Art.OX, my - 5 + i * 1.5f + 9 * Art.OY, 26, .8f, Art.Hex("#c0c4c8"));
+                for (int i = 0; i < 3; i++) mb.Circle(mx - 4 + i * 5 + 9 * Art.OX, my - 14 - i * 5 + 9 * Art.OY, 4 + i, new Color(.9f, .9f, .92f, .28f - i * .06f), 10);
+            }
+            else if (id == "choyxona")
+            {
+                // tapchan: gilam, yostiq, choynak
+                float tx = x + w - 34, ty = y0 + BS - 16;
+                mb.Box(tx, ty, 34, 12, 5, Art.Hex("#8a5a3a"), Art.Hex("#9c6a44"), true);
+                float gx = tx + 5 * Art.OX, gy = ty + 5 * Art.OY;
+                mb.Rect(gx + 2, gy + 1, 30, 10, Art.Hex("#b5403a"));
+                for (float k = gx + 4; k < gx + 30; k += 5) mb.Poly(new[] { new Vector2(k, gy + 6), new Vector2(k + 2, gy + 3), new Vector2(k + 4, gy + 6), new Vector2(k + 2, gy + 9) }, Art.Hex("#e9c46a"));
+                mb.Ellipse(gx + 17, gy + 5, 4, 2.5f, Art.Hex("#2c6aa8"));
+                mb.Ellipse(gx + 17, gy + 4, 3, 1.5f, Color.white);
+                mb.RRect(gx + 3, gy - 3, 8, 5, 2, Art.Hex("#e8a05c")); mb.RRect(gx + 22, gy - 3, 8, 5, 2, Art.Hex("#7b4a8c"));
+                // tomdagi ayvon gumbazchasi
+                mb.Arc(rx + 16, ry + d / 2, 9, 10, Mathf.PI, Mathf.PI * 2, Art.Hex("#3fb0bb"), 12);
+                mb.Rect(rx + 15.2f, ry + d / 2 - 14, 1.6f, 4, Art.Hex("#e9c46a"));
+            }
+            else
+            {
+                // tashqi stollar soyabon bilan
+                foreach (float ux in new[] { x - 2, x + w - 10 })
+                {
+                    float uy = y0 + BS - 8;
+                    mb.Ellipse(ux + 6, uy + 2, 10, 3.5f, new Color(.08f, .11f, .16f, .2f));
+                    mb.Ellipse(ux, uy - 4, 6, 3, Art.Hex("#f4f1ea"));
+                    mb.Rect(ux - 7, uy - 5, 3, 4, Art.Hex("#8a5a3a")); mb.Rect(ux + 4, uy - 5, 3, 4, Art.Hex("#8a5a3a"));
+                    mb.Rect(ux - .8f, uy - 20, 1.6f, 16, Art.Hex("#6b4a33"));
+                    mb.Arc(ux, uy - 20, 12, 6, Mathf.PI, Mathf.PI * 2, b.color, 12);
+                    mb.Arc(ux, uy - 20, 12, 2, 0, Mathf.PI, Art.Shade(b.color, -.2f), 12);
+                    mb.Ellipse(ux - 4, uy - 23, 4, 1.5f, new Color(1, 1, 1, .35f));
+                }
+            }
+            // eshik yonida gultuvaklar va menyu doskasi
+            var d0 = F(x, y, d, doorU - 6, 0); var d1 = F(x, y, d, doorU + 20, 0);
+            Planter(mb, d0.x, d0.y + 6, seed); Planter(mb, d1.x, d1.y + 6, seed + 1);
+            var mbp = F(x, y, d, doorU + 26, 0);
+            mb.Poly(new[] { new Vector2(mbp.x, mbp.y + 6), new Vector2(mbp.x + 3, mbp.y - 8), new Vector2(mbp.x + 11, mbp.y - 8), new Vector2(mbp.x + 14, mbp.y + 6) }, Art.Hex("#6b4a33"));
+            mb.Rect(mbp.x + 3.5f, mbp.y - 6, 7, 9, Art.Hex("#2b2f2a"));
+            for (int i = 0; i < 3; i++) mb.Rect(mbp.x + 4.5f, mbp.y - 5 + i * 2.6f, 5 - i, .8f, Art.Hex("#f4f1ea", .8f));
+
+            // nomli peshtaxta (tomda)
+            float sx = rx + 6, sy = ry + d / 2 - 12, sw = w - 12;
+            mb.Rect(sx + 6, sy + 16, 2, 6, Art.Hex("#3a3a3a")); mb.Rect(sx + sw - 8, sy + 16, 2, 6, Art.Hex("#3a3a3a"));
+            mb.Box(sx, sy, sw, 16, 14, b.color, Art.Shade(b.color, .12f), false);
+            for (int i = 0; i <= 12; i++)
+            {
+                float t = i / 12f;
+                var p = new Vector2(sx + sw * t, sy + 16);
+                mb.Circle(p.x, p.y - 1, .9f, Art.Hex("#fff3c4"), 5);
+                glow.Circle(p.x, p.y - 1, 2.6f, new Color(1f, .95f, .75f, .8f), 6);
+            }
+            b.labelPos = new Vector2(sx + sw / 2 + 14 * Art.OX, sy + 8 + 14 * Art.OY);
+            signs.Add(new KeyValuePair<Vector2, Color>(b.labelPos, b.color));
+            mb.Tree(x0 + 8, y0 + 12, 8, seed, D.trees);
+        }
+
+        // ================================================================ uy
+        void DrawHouse(MB mb, MB glow, Block b, int seed)
+        {
+            float x0 = b.x0, y0 = b.y0;
+            float h = b.h;
+            int style = h <= 34 ? 1 : (h >= 66 && (b.c + b.r * 2) % 3 == 0) ? 2 : 0;
+            float x = x0 + 22, y = y0 + 26, w = BS - 50, d = BS - 48;
+            var wall = b.wall;
+
+            // hovli: yo'lak, gulzor, skameyka
+            mb.RRect(x + w / 2 - 9, y + d - 2, 18, BS - (y - y0) - d + 2, 3, Art.Hex("#d6c7ab"));
+            float fbx = x + 4, fby = y + d + 6;
+            mb.RRect(fbx, fby, 24, 9, 4, Art.Hex("#7a5a3a"));
+            string[] fl = { "#ee9583", "#ffd166", "#c3a6e8", "#ff8fa3", "#ffffff" };
+            for (int i = 0; i < 7; i++) mb.Circle(fbx + 3 + i * 3.2f, fby + 3 + (i % 2) * 3, 2.2f, i % 2 == 0 ? Art.Hex("#5f9a58") : Art.Hex(fl[(seed + i) % 5]), 6);
+            float bx = x + w - 24, by = y + d + 8;
+            mb.Rect(bx, by + 3, 18, 3, Art.Hex("#9a7452")); mb.Rect(bx, by, 18, 2, Art.Hex("#b08860"));
+            mb.Rect(bx + 1, by + 6, 1.5f, 3, Art.Hex("#3a3a3a")); mb.Rect(bx + 15.5f, by + 6, 1.5f, 3, Art.Hex("#3a3a3a"));
+
+            if (style == 1)
+            {
+                // ===== an'anaviy hovli uyi =====
+                wall = Art.Hex(((seed % 3) == 0) ? "#ead2a8" : ((seed % 3) == 1) ? "#e6c9a0" : "#efd9b6");
+                mb.Box(x, y, w, d, h, wall, Art.Hex("#c9b08a"));
+                FRect(mb, x, y, d, 0, 0, w, 3, Art.Shade(wall, -.25f));
+                // yog'och to'sinlar uchi
+                for (float u = 3; u < w - 2; u += 8) FRect(mb, x, y, d, u, h - 4, u + 3, h - 1, Art.Hex("#7a5236"));
+                FRect(mb, x, y, d, -1, h - 1, w + 1, h + 1, Art.Hex("#9c6a44"));
+                // ko'k romli derazalar (panjarali)
+                var blue = Art.Hex("#3d7fd0");
+                foreach (float wu in new[] { 6f, w - 22 })
+                {
+                    bool lit = ((seed + (int)wu) % 3) != 0;
+                    Window(mb, glow, x, y, d, wu, 8, 16, 12, blue, lit, seed);
+                    FRect(mb, x, y, d, wu, 14, wu + 16, 14.8f, blue);
+                }
+                // o'ymakor yog'och eshik
+                float du = w / 2 - 8;
+                FRect(mb, x, y, d, du - 2, 0, du + 18, 21, Art.Hex("#9c6a44"));
+                FRect(mb, x, y, d, du, 0, du + 16, 19, Art.Hex("#7a4a2c"));
+                FRect(mb, x, y, d, du + 7.6f, 0, du + 8.4f, 19, Art.Hex("#5a341e"));
+                for (int k = 0; k < 2; k++)
+                    for (int r2 = 0; r2 < 3; r2++)
+                    {
+                        var c = F(x, y, d, du + 4 + k * 8, 4 + r2 * 5.5f);
+                        mb.Poly(new[] { new Vector2(c.x, c.y - 2), new Vector2(c.x + 2, c.y), new Vector2(c.x, c.y + 2), new Vector2(c.x - 2, c.y) }, Art.Hex("#c98a4b"));
+                    }
+                Ornament(mb, x, y, d, 2, w - 2, h - 10, Art.Hex("#f6ead0"), Art.Hex("#2f9e92"), Art.Hex("#c0443a"));
+                // yon devordagi deraza
+                SideWindow(mb, x, y, w, d * .3f, 8, d * .35f, 11, blue, (seed % 2) == 0);
+                // tom: tok so'risi (uzum)
+                float rx = x + h * Art.OX, ry = y + h * Art.OY;
+                for (float px = rx + 4; px < rx + w - 2; px += 9) mb.Rect(px, ry + 2, 1.5f, d - 4, Art.Hex("#8a6a48"));
+                for (int i = 0; i < 18; i++)
+                {
+                    float vx = rx + 4 + Art.Rnd(seed + i) * (w - 8), vy = ry + 4 + Art.Rnd(seed + i + 40) * (d - 8);
+                    mb.Circle(vx, vy, 4 + Art.Rnd(seed + i + 9) * 3, i % 3 == 0 ? Art.Hex("#4e8250") : i % 3 == 1 ? Art.Hex("#69a064") : Art.Hex("#86b878"), 8);
+                }
+                for (int i = 0; i < 4; i++)
+                {
+                    float gx = rx + 10 + Art.Rnd(seed + i * 7) * (w - 20), gy = ry + 8 + Art.Rnd(seed + i * 5) * (d - 16);
+                    for (int k = 0; k < 4; k++) mb.Circle(gx + (k % 2) * 2.4f, gy + k * 1.8f, 1.6f, Art.Hex("#7b4a8c"), 6);
+                }
+                b.labelPos = new Vector2(rx + w / 2 + 8, ry + d / 2 + 6);
+            }
+            else if (style == 2)
+            {
+                // ===== zamonaviy shisha bino =====
+                var glassA = Art.Hex("#4f7fa8"); var glassB = Art.Hex("#7fb3cf");
+                mb.Box(x, y, w, d, h, glassA, Art.Hex("#c9d4dc"));
+                // old devor gradiyenti va ustunlar
+                for (int i = 0; i < 6; i++) FRect(mb, x, y, d, 0, i * h / 6, w, (i + 1) * h / 6, Color.Lerp(glassA, glassB, i / 6f));
+                for (float u = 0; u <= w; u += w / 6) FRect(mb, x, y, d, u - .6f, 0, u + .6f, h, Art.Hex("#d6e2ea", .7f));
+                for (float z = 10; z < h; z += 10) FRect(mb, x, y, d, 0, z - .6f, w, z + .6f, Art.Hex("#d6e2ea", .55f));
+                // osmon aksi
+                mb.Poly(new[] { F(x, y, d, w * .15f, 0), F(x, y, d, w * .35f, 0), F(x, y, d, w * .75f, h), F(x, y, d, w * .55f, h) }, new Color(1, 1, 1, .16f));
+                // tasodifiy yoritilgan qavatlar
+                for (float z = 2; z < h - 8; z += 10)
+                    for (float u = 1; u < w - 2; u += w / 6)
+                        if (Art.Rnd(seed + (int)(z * 7 + u)) < .35f)
+                        {
+                            FRect(mb, x, y, d, u + .8f, z, u + w / 6 - .8f, z + 7, Art.Hex("#ffe1a1", .85f));
+                            glow.Quad(F(x, y, d, u + .8f, z), F(x, y, d, u + w / 6 - .8f, z), F(x, y, d, u + w / 6 - .8f, z + 7), F(x, y, d, u + .8f, z + 7), Art.Hex("#ffd48a"));
+                        }
+                // kirish (kanop)
+                float du = w / 2 - 10;
+                FRect(mb, x, y, d, du, 0, du + 20, 12, Art.Hex("#2b3d50"));
+                mb.Box(F(x, y, d, du - 3, 13).x, F(x, y, d, du - 3, 13).y - 1, 26, 6, 2, Art.Hex("#e8eef4"), null, false);
+                // tom: bog' va vertolyot maydonchasi
+                float rx = x + h * Art.OX, ry = y + h * Art.OY;
+                mb.Circle(rx + w * .62f, ry + d * .5f, 13, Art.Hex("#8e9aa3"), 20);
+                mb.Circle(rx + w * .62f, ry + d * .5f, 11, Art.Hex("#a9b4bc"), 20);
+                mb.Rect(rx + w * .62f - 4, ry + d * .5f - 5, 2, 10, Color.white); mb.Rect(rx + w * .62f + 2, ry + d * .5f - 5, 2, 10, Color.white); mb.Rect(rx + w * .62f - 4, ry + d * .5f - 1, 8, 2, Color.white);
+                for (int i = 0; i < 6; i++) mb.Circle(rx + 8 + (i % 3) * 7, ry + 8 + (i / 3) * 7, 4, i % 2 == 0 ? Art.Hex("#5f9a58") : Art.Hex("#4e8250"), 8);
+                glow.Circle(rx + w - 4, ry + 4, 3, new Color(1, .3f, .3f, 1), 8); mb.Circle(rx + w - 4, ry + 4, 1.4f, Art.Hex("#ff5d5d"), 6);
+                b.labelPos = new Vector2(rx + w / 2 - 8, ry + d / 2 + 8);
+            }
+            else
+            {
+                // ===== ko'p qavatli turar joy (balkonli) =====
+                mb.Box(x, y, w, d, h, wall);
+                FRect(mb, x, y, d, 0, 0, w, 4, Art.Shade(wall, -.28f));
+                int floors = Mathf.Max(2, Mathf.RoundToInt((h - 8) / 14f));
+                float fh = (h - 10) / floors;
+                var frame = Art.Shade(wall, -.38f);
+                for (int f = 0; f < floors; f++)
+                {
+                    float z = 5 + f * fh;
+                    // qavatlar orasidagi chiziq
+                    if (f > 0) FRect(mb, x, y, d, 0, z - 1.5f, w, z - .8f, Art.Shade(wall, -.1f));
+                    for (int k = 0; k < 4; k++)
+                    {
+                        float u = 6 + k * (w - 12) / 4f;
+                        bool lit = ((b.c * 5 + b.r * 7 + f * 3 + k) % 5) < 2;
+                        if (f == 0 && k == 1) continue; // eshik joyi
+                        Window(mb, glow, x, y, d, u + 1, z + 2, 8, fh * .55f, frame, lit, seed + f + k);
+                        // balkon (har ikkinchi ustunda, 1-qavatdan yuqorida)
+                        if (f > 0 && (k % 2 == (b.c + b.r) % 2))
+                        {
+                            float bz = z + .5f;
+                            FRect(mb, x, y, d, u - 1.5f, bz, u + 11.5f, bz + 1.5f, Art.Shade(wall, .15f));
+                            var p0 = F(x, y, d, u - 1.5f, bz); var p1 = F(x, y, d, u + 11.5f, bz);
+                            mb.Quad(new Vector2(p0.x, p0.y + 3), new Vector2(p1.x, p1.y + 3), p1, p0, Art.Shade(wall, -.15f));       // tag tomoni
+                            mb.Quad(new Vector2(p0.x, p0.y + 3), new Vector2(p1.x, p1.y + 3), new Vector2(p1.x, p1.y - 2), new Vector2(p0.x, p0.y - 2), Art.Hex("#e9e1d2", .9f)); // to'siq
+                            for (float r2 = p0.x + 2; r2 < p1.x - 1; r2 += 2.5f) mb.Rect(r2, p0.y - 2, .6f, 4, Art.Shade(wall, -.3f));
+                            if ((seed + f + k) % 3 == 0) mb.Circle(p0.x + 3, p0.y - 3, 2.4f, Art.Hex("#69a064"), 6); // gul
+                        }
+                    }
+                }
+                // podyezd eshigi va soyabon
+                float du = 6 + (w - 12) / 4f;
+                FRect(mb, x, y, d, du, 0, du + 11, 14, Art.Hex("#6b5446"));
+                FRect(mb, x, y, d, du + 1.5f, 8, du + 9.5f, 12.5f, Art.Hex("#ffd48a"));
+                var cp = F(x, y, d, du - 3, 15);
+                mb.Quad(cp, F(x, y, d, du + 14, 15), new Vector2(F(x, y, d, du + 14, 15).x, F(x, y, d, du + 14, 15).y + 3), new Vector2(cp.x, cp.y + 3), Art.Hex("#2f6f66"));
+                var lamp = F(x, y, d, du + 5.5f, 16.5f);
+                mb.Circle(lamp.x, lamp.y, 1.4f, Art.Hex("#fff1c9"), 6); glow.Circle(lamp.x, lamp.y, 5, new Color(1, .9f, .7f, .8f), 8);
+                Ornament(mb, x, y, d, 2, w - 2, h - 8, Art.Shade(wall, .18f), Art.Hex("#2f9e92"), Art.Hex("#e9c46a"));
+                // yon devor: derazalar va konditsionerlar
+                for (int f = 0; f < floors; f++)
+                    for (int k = 0; k < 2; k++)
+                    {
+                        float z = 5 + f * fh + 2, t = 10 + k * (d - 24) / 1.4f;
+                        bool lit = ((b.c + f * 2 + k) % 4) == 0;
+                        SideWindow(mb, x, y, w, t, z, 9, fh * .5f, frame, lit);
+                        if ((f + k + b.r) % 3 == 0)
+                        {
+                            var ac = E(x, y, w, t + 11, z);
+                            mb.Quad(ac, new Vector2(ac.x + 3, ac.y - 2), new Vector2(ac.x + 3, ac.y + 3), new Vector2(ac.x, ac.y + 5), Art.Hex("#e8eef4"));
+                        }
+                    }
+                // tom: parapet, suv baki / antenna / quyosh panellari
+                float rx = x + h * Art.OX, ry = y + h * Art.OY;
+                var edge = Art.Shade(wall, -.15f);
+                mb.Rect(rx + 2, ry + 2, w - 4, 2.5f, edge); mb.Rect(rx + 2, ry + d - 4.5f, w - 4, 2.5f, edge);
+                mb.Rect(rx + 2, ry + 2, 2.5f, d - 4, edge); mb.Rect(rx + w - 4.5f, ry + 2, 2.5f, d - 4, edge);
+                int kind = (b.c * 2 + b.r * 3) % 3;
+                if (kind == 0) { mb.Box(rx + 8, ry + 8, 14, 10, 7, Art.Hex("#c9ced2"), null, false); mb.Box(rx + 28, ry + 8, 10, 8, 5, Art.Hex("#b9bec2"), null, false); }
+                else if (kind == 1) { for (int i = 0; i < 3; i++) { mb.Rect(rx + 8 + i * 12, ry + 8, 10, 16, Art.Hex("#3f5f86")); mb.Rect(rx + 8 + i * 12, ry + 8, 10, 1, new Color(1, 1, 1, .35f)); mb.Rect(rx + 8 + i * 12, ry + 15.5f, 10, .8f, new Color(1, 1, 1, .25f)); } }
+                else { mb.Rect(rx + 8, ry + 4, 16, 10, Art.Hex("#a9b4bc")); mb.Ellipse(rx + 16, ry + 14, 8, 4, Art.Hex("#8e9aa3")); mb.Ellipse(rx + 16, ry + 4, 8, 4, Art.Hex("#a9b4bc")); mb.Rect(rx + 34, ry + 2, 1, 14, Art.Hex("#6b737a")); mb.Rect(rx + 30, ry + 5, 9, .8f, Art.Hex("#6b737a")); }
+                if (Eski) for (int i = 0; i < 5; i++) mb.Circle(rx + w - 36 + i * 6, ry + d - 10 + (i % 2) * 3, 5, Art.Hex("#5f8f4e"), 8);
+                b.labelPos = new Vector2(rx + w / 2 + 8, ry + d / 2 + 6);
+            }
+            if (D.id == "markaz" && b.key == Data.HOME_R)
+            {
+                float rx = x + h * Art.OX, ry = y + h * Art.OY;
+                for (int i = 0; i < 6; i++) mb.Circle(rx + w - 30 + i * 5, ry + d - 8 + (i % 2) * 3, 5, i % 2 == 1 ? Art.Hex("#5f8f4e") : Art.Hex("#4b7a40"), 8);
+            }
+            mb.Tree(x0 + 11, y0 + BS - 9, 9, seed, D.trees);
+        }
+
         void BuildTall(Block b, MB glow)
         {
             var mb = new MB();
@@ -266,79 +632,8 @@ namespace CozyCourier
                 b.labelPos = new Vector2(cx, cy + 21);
                 signs.Add(new KeyValuePair<Vector2, Color>(new Vector2(cx, cy - 20), Art.Hex("#3fb0bb")));
             }
-            else if (b.type == "rest")
-            {
-                float x = x0 + 18, y = y0 + 22, w = BS - 40, d = BS - 40, h = 30;
-                mb.Box(x, y, w, d, h, Art.Hex("#f1e5cf"), Art.Hex("#f7efe0"));
-                mb.Rect(x + h * Art.OX + 4, y + h * Art.OY + 4, w - 8, d - 8, new Color(0, 0, 0, .06f));
-                for (int i = 0; i < 7; i++)
-                {
-                    var a = MB.FP(x, y, d, h, i * w / 7, .6f);
-                    var e = MB.FP(x, y, d, h, (i + 1) * w / 7, .6f);
-                    mb.Quad(a, e, new Vector2(e.x - 1, e.y + 11), new Vector2(a.x + 1, a.y + 11), i % 2 == 1 ? Art.Hex("#fff8ec") : b.color);
-                    mb.Arc((a.x + e.x) / 2, a.y + 11, (e.x - a.x) / 2, 3, 0, Mathf.PI, i % 2 == 1 ? Art.Hex("#fff8ec") : b.color, 6);
-                }
-                for (int i = 0; i < 3; i++)
-                {
-                    var p = MB.FP(x, y, d, h, 10 + i * (w - 20) / 3, .05f);
-                    mb.Rect(p.x, p.y - 11, (w - 20) / 3 - 6, 10, Art.Hex("#ffe1a1"));
-                    glow.Rect(p.x, p.y - 11, (w - 20) / 3 - 6, 10, new Color(1f, .82f, .55f, .9f));
-                }
-                float ux = x0 + BS - 24, uy = y0 + BS - 18;
-                mb.Ellipse(ux + 5, uy + 3, 12, 5, new Color(.08f, .11f, .16f, .2f));
-                mb.Rect(ux - 1, uy - 18, 2, 18, Art.Hex("#6b4a33"));
-                mb.Ellipse(ux, uy - 18, 13, 6, b.color);
-                mb.Ellipse(ux - 3, uy - 19, 5, 2, new Color(1, 1, 1, .35f));
-                float sx = x + h * Art.OX + 6, sy = y + h * Art.OY + d / 2 - 14, sw = w - 12;
-                mb.Box(sx, sy, sw, 16, 14, b.color, b.color, false);
-                b.labelPos = new Vector2(sx + sw / 2 + 14 * Art.OX, sy + 8 + 14 * Art.OY);
-                signs.Add(new KeyValuePair<Vector2, Color>(b.labelPos, b.color));
-                mb.Tree(x0 + 10, y0 + BS - 8, 9, seed, D.trees);
-            }
-            else
-            {
-                float x = x0 + 22, y = y0 + 26, w = BS - 50, d = BS - 48, h = b.h;
-                mb.Box(x, y, w, d, h, b.wall);
-                int floors = Mathf.Max(2, Mathf.RoundToInt(h / 15f));
-                for (int f = 0; f < floors; f++)
-                    for (int k = 0; k < 4; k++)
-                    {
-                        var p = MB.FP(x, y, d, h, 8 + k * (w - 16) / 3 - 4, (f + .5f) / (floors + .3f));
-                        bool lit = ((b.c * 5 + b.r * 7 + f * 3 + k) % 5) < 2;
-                        mb.Rect(p.x - 1, p.y - 5, 10, 9, Art.Shade(b.wall, -.35f));
-                        mb.Rect(p.x, p.y - 4, 8, 7, lit ? Art.Hex("#ffe1a1") : Art.Hex("#5f7488"));
-                        mb.Rect(p.x, p.y - 4, 3, 2, new Color(1, 1, 1, .3f));
-                        if (lit)
-                        {
-                            glow.Rect(p.x, p.y - 4, 8, 7, Art.Hex("#ffd48a"));
-                            glow.Circle(p.x + 4, p.y, 11, new Color(1f, .78f, .47f, .18f), 10);
-                        }
-                        if (k == 1 && f > 0 && floors > 3) mb.Rect(p.x - 3, p.y + 3, 14, 2, Art.Shade(b.wall, -.25f));
-                    }
-                for (int f = 0; f < floors; f++)
-                    for (int k = 0; k < 3; k++)
-                    {
-                        float vv = (f + .5f) / (floors + .3f), u = 10 + k * (d - 20) / 2.4f;
-                        float px = x + w + h * vv * Art.OX + 2, py = y + u + h * vv * Art.OY;
-                        mb.Poly(new[] { new Vector2(px, py), new Vector2(px + 3, py - 6), new Vector2(px + 3, py + 1), new Vector2(px, py + 7) }, new Color(.24f, .31f, .39f, .45f));
-                    }
-                var dp = MB.FP(x, y, d, h, w / 2 - 6, 0);
-                mb.Rect(dp.x, dp.y - 12, 12, 12, Art.Hex("#6b5446"));
-                mb.Rect(dp.x + 5, dp.y - 16, 2, 2, Art.Hex("#ffd48a"));
-                float rx = x + h * Art.OX, ry = y + h * Art.OY;
-                var edge = Art.Shade(b.wall, -.15f);
-                mb.Rect(rx + 3, ry + 3, w - 6, 2, edge); mb.Rect(rx + 3, ry + d - 5, w - 6, 2, edge);
-                mb.Rect(rx + 3, ry + 3, 2, d - 6, edge); mb.Rect(rx + w - 5, ry + 3, 2, d - 6, edge);
-                int kind = (b.c * 2 + b.r * 3) % 3;
-                if (kind == 0) { mb.Box(rx + 8, ry + 8, 14, 10, 7, Art.Hex("#c9ced2"), null, false); mb.Box(rx + 28, ry + 8, 10, 8, 5, Art.Hex("#b9bec2"), null, false); }
-                else if (kind == 1) { for (int i = 0; i < 3; i++) { mb.Rect(rx + 8 + i * 12, ry + 8, 10, 16, Art.Hex("#4a6b8f")); mb.Rect(rx + 8 + i * 12, ry + 15.5f, 10, 1, new Color(1, 1, 1, .3f)); } }
-                else { mb.Rect(rx + 8, ry + 4, 16, 10, Art.Hex("#a9b4bc")); mb.Ellipse(rx + 16, ry + 14, 8, 4, Art.Hex("#8e9aa3")); mb.Ellipse(rx + 16, ry + 4, 8, 4, Art.Hex("#a9b4bc")); }
-                if (Eski) for (int i = 0; i < 5; i++) mb.Circle(rx + w - 36 + i * 6, ry + d - 10 + (i % 2) * 3, 5, Art.Hex("#5f8f4e"), 8);
-                if (D.id == "markaz" && b.key == Data.HOME_R)
-                    for (int i = 0; i < 6; i++) mb.Circle(rx + w - 30 + i * 5, ry + d - 8 + (i % 2) * 3, 5, i % 2 == 1 ? Art.Hex("#5f8f4e") : Art.Hex("#4b7a40"), 8);
-                b.labelPos = new Vector2(rx + w / 2 + 8, ry + d / 2 + 6);
-                mb.Tree(x0 + 11, y0 + BS - 9, 9, seed, D.trees);
-            }
+            else if (b.type == "rest") DrawRest(mb, glow, b, seed);
+            else DrawHouse(mb, glow, b, seed);
             // fonar
             bool corner = (b.c + b.r) % 2 == 1;
             float lx = corner ? x0 + 7 : x0 + BS - 7, ly = corner ? y0 + BS - 7 : y0 + 7;
