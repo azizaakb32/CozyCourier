@@ -1,0 +1,145 @@
+using System.Collections.Generic;
+using System.Globalization;
+using UnityEngine;
+
+namespace CozyCourier
+{
+    /// <summary>Uch til: 0 = o'zbek, 1 = rus, 2 = ingliz.</summary>
+    public static class Loc
+    {
+        public static int L;
+
+        static readonly Dictionary<string, string[]> T = new Dictionary<string, string[]>
+        {
+            {"tagline", new[]{"Toshkent · kuz · kechki smena","Ташкент · осень · вечерняя смена","Tashkent · autumn · evening shift"}},
+            {"mmTag", new[]{"Kuzgi Toshkentda ovqat yetkazing, skuterni yaxshilang va eski «Tez Yetkaz» xizmatini qayta tiklang.","Развозите еду по осеннему Ташкенту, улучшайте скутер и возродите старую службу «Тез Етказ».","Deliver food across autumn Tashkent, upgrade your scooter and bring the old Tez Yetkaz business back to life."}},
+            {"story", new[]{"Hikoya","История","Story"}},
+            {"storyStart", new[]{"5 kunlik hikoyani boshlash","Начать историю из 5 дней","Begin the 5-day story"}},
+            {"storyCont", new[]{"Davom etish: {0}","Продолжить: {0}","Continue: {0}"}},
+            {"storyReplay", new[]{"Hikoya tugadi · qayta ko'rish","История пройдена · пересмотреть","Story complete · replay"}},
+            {"free", new[]{"Erkin smena","Свободная смена","Free shift"}},
+            {"freeSub", new[]{"Istalgan mahallada","В любом районе","In any district"}},
+            {"garage", new[]{"Garaj","Гараж","Garage"}},
+            {"garageSub", new[]{"Yaxshilash va ta'mir","Улучшения и ремонт","Upgrades and restoration"}},
+            {"settings", new[]{"Sozlamalar","Настройки","Settings"}},
+            {"settingsSub", new[]{"Til, ovoz, natijalar","Язык, звук, прогресс","Language, sound, progress"}},
+            {"howto", new[]{"Qanday o'ynaladi","Как играть","How to play"}},
+            {"howtoSub", new[]{"Qoidalar va boshqaruv","Правила и управление","Rules and controls"}},
+            {"chooseDistrict", new[]{"Mahallani tanlang","Выберите район","Choose a district"}},
+            {"start", new[]{"Smenani boshlash","Начать смену","Start shift"}},
+            {"back", new[]{"Orqaga","Назад","Back"}},
+            {"menu", new[]{"Bosh menyu","Главное меню","Main menu"}},
+            {"pause", new[]{"Pauza","Пауза","Pause"}},
+            {"resume", new[]{"Davom etish","Продолжить","Resume"}},
+            {"pauseTitle", new[]{"Bir oz dam oling","Немного отдохните","Take a short break"}},
+            {"pauseText", new[]{"Shahar sizni kutib turadi. Bosh menyuga chiqsangiz, topilgan pul saqlanadi.","Город подождёт. Если выйти в меню, заработанное сохранится.","The city will wait. If you go to the main menu, your earnings are kept."}},
+            {"lang", new[]{"Til","Язык","Language"}},
+            {"music", new[]{"Fon musiqasi","Фоновая музыка","Background music"}},
+            {"musicShort", new[]{"Musiqa","Музыка","Music"}},
+            {"sfx", new[]{"Ovoz effektlari","Звуковые эффекты","Sound effects"}},
+            {"on", new[]{"Yoqilgan","Вкл","On"}},
+            {"off", new[]{"O'chirilgan","Выкл","Off"}},
+            {"resetStory", new[]{"Hikoyani boshidan boshlash","Начать историю заново","Restart the story"}},
+            {"restart", new[]{"Qayta boshlash","Заново","Restart"}},
+            {"resetAll", new[]{"Barcha natijalarni o'chirish","Сбросить весь прогресс","Reset all progress"}},
+            {"erase", new[]{"O'chirish","Сбросить","Reset"}},
+            {"resetConfirm", new[]{"Rostdan ham? Pul, daraja, xaridlar va hikoya o'chadi.","Точно? Деньги, уровень, покупки и история будут сброшены.","Are you sure? Money, level, purchases and story will be erased."}},
+            {"yesReset", new[]{"Ha, o'chirish","Да, сбросить","Yes, reset"}},
+            {"cancel", new[]{"Bekor qilish","Отмена","Cancel"}},
+            {"resetDone", new[]{"Natijalar o'chirildi.","Прогресс сброшен.","Progress reset."}},
+            {"storyReset", new[]{"Hikoya boshidan boshlanadi.","История начнётся заново.","The story will start over."}},
+            {"helpTitle", new[]{"Kuryer qo'llanmasi","Памятка курьера","Courier handbook"}},
+            {"controls", new[]{"Boshqaruv: ↑ ↓ ← → yoki WASD · pauza P / Esc · sahnada Probel. Telefonda ekrandagi tugmalar.","Управление: ↑ ↓ ← → или WASD · пауза P / Esc · в сценах Пробел. На телефоне кнопки на экране.","Controls: ↑ ↓ ← → or WASD · pause P / Esc · Space in scenes. On a phone, use the on-screen buttons."}},
+            {"wallet", new[]{"Hamyon","Кошелёк","Wallet"}},
+            {"level", new[]{"Daraja","Уровень","Level"}},
+            {"time", new[]{"Soat","Время","Time"}},
+            {"shift", new[]{"Smena","Смена","Shift"}},
+            {"income", new[]{"Daromad","Доход","Income"}},
+            {"fines", new[]{"Shtraf","Штрафы","Fines"}},
+            {"rating", new[]{"Reyting","Рейтинг","Rating"}},
+            {"orders", new[]{"Buyurtmalar","Заказы","Orders"}},
+            {"bag", new[]{"Sumka","Сумка","Bag"}},
+            {"waiting", new[]{"Buyurtmalar kutilmoqda…\nBemalol aylanib turing.","Ждём заказы…\nМожно покататься.","Waiting for orders…\nFeel free to cruise."}},
+            {"pick", new[]{"OLIB KETISH","ЗАБРАТЬ","PICK UP"}},
+            {"drop", new[]{"YETKAZISH","ДОСТАВИТЬ","DELIVER"}},
+            {"lateChip", new[]{"KECHIKDI","ОПОЗДАНИЕ","LATE"}},
+            {"storyChip", new[]{"HIKOYA","СЮЖЕТ","STORY"}},
+            {"newOrder", new[]{"Yangi buyurtma #{0}: {1}","Новый заказ #{0}: {1}","New order #{0}: {1}"}},
+            {"storyOrder", new[]{"Hikoya buyurtmasi: {0} → {1}","Сюжетный заказ: {0} → {1}","Story order: {0} → {1}"}},
+            {"hold", new[]{"Smena tugadi. Hikoya buyurtmasini shoshilmay yetkazing","Смена окончена. Спокойно доставьте сюжетный заказ","Shift's over. Deliver the story order at your own pace"}},
+            {"picked", new[]{"Olindi","Забрано","Picked up"}},
+            {"withTip", new[]{" choychaqa bilan"," с чаевыми"," with tip"}},
+            {"withGift", new[]{" sovg'a bilan"," с подарком"," with gift"}},
+            {"fineCar", new[]{"Shtraf: −{0}. Mashinalardan ehtiyot bo'ling","Штраф: −{0}. Осторожнее с машинами","Fine: −{0}. Watch out for cars"}},
+            {"late", new[]{"#{0} kechikmoqda. Hammasi joyida, shoshilmay yetkazing","#{0} опаздывает. Ничего страшного, без спешки","#{0} is running late. That's okay, no rush"}},
+            {"bagFull", new[]{"Sumka to'la, avval yetkazing","Сумка полна, сначала доставьте","Bag is full, deliver first"}},
+            {"redGai", new[]{"Qizil chiroq! YHXB shtrafi: −{0}","Красный свет! Штраф ДПС: −{0}","Red light! Police fine: −{0}"}},
+            {"redFree", new[]{"Qizil chiroqdan o'tdingiz. Bu safar hech kim ko'rmadi","Вы проехали на красный. В этот раз никто не видел","You ran a red light. Nobody saw it this time"}},
+            {"newLevel", new[]{"Yangi daraja: {0}!","Новый уровень: {0}!","Level up: {0}!"}},
+            {"unlocked", new[]{"Ochildi: {0}","Открыто: {0}","Unlocked: {0}"}},
+            {"restU", new[]{"{0} restorani","ресторан «{0}»","{0} restaurant"}},
+            {"distU", new[]{"{0} mahallasi","район {0}","{0} district"}},
+            {"dayDone", new[]{"{0} yakunlandi","{0} завершён","{0} complete"}},
+            {"shiftOver", new[]{"Smena tugadi, rahmat!","Смена окончена, спасибо!","Shift over, thank you!"}},
+            {"contStory", new[]{"Hikoyani davom ettirish","Продолжить историю","Continue the story"}},
+            {"again", new[]{"Yana bir smena","Ещё одна смена","Another shift"}},
+            {"endInfo", new[]{
+                "Daromad: {0} (choychaqa va sovg'alar {1})\nShtraflar: −{2} · urilish {3}, kechikish {4}, qizil chiroq {5}\nYetkazildi: {6} · Reyting: {7} ★ · +{8} XP\nHamyonda: {9}",
+                "Доход: {0} (чаевые и подарки {1})\nШтрафы: −{2} · столкновения {3}, опоздания {4}, красный свет {5}\nДоставлено: {6} · Рейтинг: {7} ★ · +{8} XP\nВ кошельке: {9}",
+                "Income: {0} (tips and gifts {1})\nFines: −{2} · crashes {3}, late {4}, red lights {5}\nDelivered: {6} · Rating: {7} ★ · +{8} XP\nIn wallet: {9}"}},
+            {"record", new[]{"Yangi rekord!","Новый рекорд!","New record!"}},
+            {"lvlUpEnd", new[]{"{0}-daraja!","Уровень {0}!","Level {0}!"}},
+            {"seeGarage", new[]{"Garajda yangi narsalarni ko'ring.","Загляните в гараж.","Check the garage for new items."}},
+            {"double", new[]{"Reklama ko'rib daromadni 2 baravar qilish","Посмотреть рекламу и удвоить доход","Watch an ad to double your earnings"}},
+            {"doubled", new[]{"Daromad 2 baravar oshdi: +{0}","Доход удвоен: +{0}","Earnings doubled: +{0}"}},
+            {"adFail", new[]{"Reklama hozir mavjud emas, keyinroq urinib ko'ring","Реклама сейчас недоступна, попробуйте позже","No ad available right now, try again later"}},
+            {"garageTitle", new[]{"Skuter va xizmat","Скутер и служба","Scooter & business"}},
+            {"tabUp", new[]{"Yaxshilash","Улучшения","Upgrades"}},
+            {"tabLook", new[]{"Ko'rinish","Внешний вид","Looks"}},
+            {"tabReno", new[]{"Xizmatni tiklash","Восстановление","Restoration"}},
+            {"maxed", new[]{"Maksimal","Максимум","Maxed"}},
+            {"equipped", new[]{"Tanlangan","Выбрано","Equipped"}},
+            {"equip", new[]{"Tanlash","Выбрать","Equip"}},
+            {"atLevel", new[]{"{0}-darajada","С {0} уровня","Level {0}"}},
+            {"installed", new[]{"{0} o'rnatildi.","{0}: установлено.","{0} installed."}},
+            {"bought", new[]{"{0} sotib olindi.","{0}: куплено.","{0} purchased."}},
+            {"renoProg", new[]{"«Tez Yetkaz» tiklanmoqda: {0} / {1}","«Тез Етказ» восстанавливается: {0} / {1}","Restoring Tez Yetkaz: {0} / {1}"}},
+            {"renoDesc", new[]{"Har bir ta'mir ofis va ko'cha sahnalarida ko'rinadi.","Каждое улучшение видно в сценах офиса и улицы.","Every improvement shows up in the office and street scenes."}},
+            {"watch", new[]{"Sahnani ko'rish","Смотреть сцену","Watch scene"}},
+            {"slots", new[]{"ta joy","мест","slots"}},
+            {"homeD", new[]{"Asosiy mahalla","Основной район","Home district"}},
+            {"payBonus", new[]{"+{0}% to'lov","+{0}% к оплате","+{0}% pay"}},
+            {"unlocksAt", new[]{"{0}-darajada ochiladi","Откроется на {0} уровне","Unlocks at level {0}"}},
+            {"tapContinue", new[]{"Davom etish uchun bosing","Нажмите, чтобы продолжить","Tap to continue"}},
+            {"tapHint", new[]{"Bosing yoki Probel ▶","Нажмите или Пробел ▶","Tap or Space ▶"}},
+            {"skip", new[]{"Sahnani o'tkazish","Пропустить сцену","Skip scene"}},
+            {"cur", new[]{"so'm","сум","sum"}},
+            {"since", new[]{"1994 yildan beri","с 1994 года","since 1994"}},
+            {"bazar", new[]{"Chorsu bozori","Базар Чорсу","Chorsu Bazaar"}},
+        };
+
+        public static readonly string[][] Help =
+        {
+            new[]{"Doira belgili restoranga boring, ovqat avtomatik olinadi. Keyin kvadrat belgili uyga yetkazing.","Подъезжайте к ресторану с круглой меткой, еда забирается автоматически. Затем везите в дом с квадратной меткой.","Ride to the restaurant with a round marker; the food is picked up automatically. Then take it to the house with the square marker."},
+            new[]{"Oltin yulduz — hikoya buyurtmasi. Uning vaqt chegarasi yo'q va yetkazganda sahna ochiladi.","Золотая звезда — сюжетный заказ. У него нет таймера, а после доставки открывается сцена.","A gold star is a story order. It has no timer, and delivering it opens a scene."},
+            new[]{"Chorrahadagi chiziqlar svetofor rangini ko'rsatadi. Qizilda to'xtang: YHXB posti yonida qizildan o'tsangiz shtraf olasiz.","Полосы на перекрёстке показывают цвет светофора. На красный стойте: рядом с постом ДПС за проезд будет штраф.","The bars at a crossing show the light. Stop on red: running it near a police post gets you fined."},
+            new[]{"Shtraflar: mashinaga urilish −5 000, kechikish −3 000, qizil chiroq −8 000. Sug'urta ularni yarmiga kamaytiradi.","Штрафы: столкновение −5 000, опоздание −3 000, красный свет −8 000. Страховка уменьшает их вдвое.","Fines: hitting a car −5,000, late delivery −3,000, red light −8,000. Insurance halves them."},
+            new[]{"Pul hamyonda yig'iladi. Garajda skuterni yaxshilang, ranglarni tanlang va «Tez Yetkaz» ofisini tiklang.","Деньги копятся в кошельке. В гараже улучшайте скутер, выбирайте цвета и восстанавливайте офис «Тез Етказ».","Money builds up in your wallet. In the garage, upgrade the scooter, pick colours and restore the Tez Yetkaz office."},
+            new[]{"Har bir yetkazish XP beradi. Daraja oshgani sari yangi restoranlar va mahallalar ochiladi. Yutqazish yo'q.","Каждая доставка даёт опыт. С уровнем открываются рестораны и районы. Проиграть нельзя.","Every delivery gives XP. New restaurants and districts unlock as you level up. You can't lose."},
+        };
+
+        public static string Get(string key, params object[] args)
+        {
+            if (!T.TryGetValue(key, out var v)) return key;
+            string s = v[Mathf.Clamp(L, 0, v.Length - 1)];
+            return args != null && args.Length > 0 ? string.Format(s, args) : s;
+        }
+
+        public static string Tx(string[] a) => a == null || a.Length == 0 ? "" : a[Mathf.Clamp(L, 0, a.Length - 1)];
+
+        public static string House(int n) => L == 0 ? n + "-uy" : L == 1 ? "дом " + n : "No. " + n;
+
+        public static string Num(int n) => n.ToString("N0", CultureInfo.InvariantCulture).Replace(",", " ");
+        public static string Money(int n) => Num(n) + " " + Get("cur");
+    }
+}
