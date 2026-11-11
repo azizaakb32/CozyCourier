@@ -29,7 +29,7 @@ namespace CozyCourier
         RectTransform districtsBox, confirmBox, gItems, gTabs;
         Button endDouble, endNext;
         UText endNextLbl;
-        string gTab = "up";
+        string gTab = "veh";
         bool garageFromEnd;
         int endNet, lastNet; bool endRec, endStory;
 
@@ -70,6 +70,7 @@ namespace CozyCourier
             BuildLeft();
             BuildRight();
             BuildPad();
+            BuildGhost();
             BuildToast();
             ovMenu = BuildMenu();
             ovFree = BuildFree();
@@ -268,6 +269,47 @@ namespace CozyCourier
             j.Init(bas.rectTransform, knob.rectTransform, 80);
             pad.SetSiblingIndex(markers.GetSiblingIndex() + 1); // panellar joystik ustida qoladi
             pad.gameObject.SetActive(false);
+        }
+
+        // ko'rinmas rejim tugmasi (o'ng pastda)
+        Button ghostBtn; UText ghostLbl; Image ghostImg;
+        void BuildGhost()
+        {
+            var b = UI.Box(root, Art.Hex("#101b22", .88f), "Ghost");
+            b.raycastTarget = true;
+            UI.Place(b.rectTransform, new Vector2(1, 0), new Vector2(1, 0), new Vector2(-24, 24), new Vector2(150, 92));
+            ghostImg = b;
+            var ic = UI.Pic(b.transform, Art.Circle, Art.Hex("#7ec8e3", .9f), "icon");
+            UI.Place(ic.rectTransform, new Vector2(.5f, 1), new Vector2(.5f, 1), new Vector2(0, -8), new Vector2(34, 34));
+            var eyeL = UI.Pic(ic.transform, Art.Circle, Art.Hex("#14222a"), "e"); UI.Place(eyeL.rectTransform, new Vector2(.5f, .5f), new Vector2(.5f, .5f), new Vector2(-6, 3), new Vector2(6, 8));
+            var eyeR = UI.Pic(ic.transform, Art.Circle, Art.Hex("#14222a"), "e"); UI.Place(eyeR.rectTransform, new Vector2(.5f, .5f), new Vector2(.5f, .5f), new Vector2(6, 3), new Vector2(6, 8));
+            var t = UI.Label(b.transform, Loc.Get("ghost"), 18, UI.Fg, TextAnchor.MiddleCenter, FontStyle.Bold);
+            UI.Place(t.rectTransform, new Vector2(.5f, 0), new Vector2(.5f, 0), new Vector2(0, 26), new Vector2(150, 22));
+            ghostLbl = UI.Label(b.transform, "", 15, UI.Gold, TextAnchor.MiddleCenter, FontStyle.Bold);
+            UI.Place(ghostLbl.rectTransform, new Vector2(.5f, 0), new Vector2(.5f, 0), new Vector2(0, 8), new Vector2(150, 20));
+            ghostBtn = b.gameObject.AddComponent<Button>();
+            ghostBtn.transition = Selectable.Transition.None;
+            ghostBtn.onClick.AddListener(() => G.TryGhost());
+            b.gameObject.SetActive(false);
+        }
+
+        void UpdateGhost()
+        {
+            if (ghostBtn == null) return;
+            bool show = view == View.Play;
+            if (ghostBtn.gameObject.activeSelf != show) ghostBtn.gameObject.SetActive(show);
+            if (!show) return;
+            if (G.Ghost)
+            {
+                ghostLbl.text = Loc.Get("ghostLeft", Mathf.CeilToInt(G.ghost));
+                ghostImg.color = Art.Hex("#1f4d5a", .9f + .1f * Mathf.Sin(Time.time * 6f));
+            }
+            else if (G.ghostUses >= Game.GHOST_PER_SHIFT) { ghostLbl.text = Loc.Get("ghostNone"); ghostImg.color = Art.Hex("#101b22", .6f); }
+            else
+            {
+                ghostLbl.text = Loc.Get(Save.NoAds ? "ghostFree" : "ghostAd", Mathf.RoundToInt(Game.GHOST_TIME));
+                ghostImg.color = Art.Hex("#101b22", .88f);
+            }
         }
 
         void BuildLeaves()
@@ -477,21 +519,51 @@ namespace CozyCourier
             UpdateAdBtn();
             gLvl.text = Loc.Get("level") + " " + Save.Level;
             Clear(gTabs);
-            string[] tabs = { "up", "look", "reno" }, names = { "tabUp", "tabLook", "tabReno" };
-            for (int i = 0; i < 3; i++)
+            string[] tabs = { "veh", "up", "look", "reno" }, names = { "tabVeh", "tabUp", "tabLook", "tabReno" };
+            for (int i = 0; i < tabs.Length; i++)
             {
                 string id = tabs[i]; bool on = gTab == id;
                 UI.Btn(gTabs, Loc.Get(names[i]), on ? UI.Fg : UI.Panel2, on ? UI.Ink : UI.Muted, () => { gTab = id; RenderGarage(); }, 20);
             }
             Clear(gItems);
             int W = Save.Wallet, L = Save.Level;
-            if (gTab == "up")
+            if (gTab == "veh")
+            {
+                var sc = Data.Look("scooter", Save.Equipped("scooter"));
+                foreach (var v in Data.Vehicles)
+                {
+                    bool owned = Save.OwnedVeh(v.id), on = Save.Vehicle == v.id, locked = !v.iap && v.lvl > L;
+                    string btn; bool can; int style;
+                    if (on) { btn = Loc.Get("riding"); can = false; style = 2; }
+                    else if (owned) { btn = Loc.Get("ride"); can = true; style = 1; }
+                    else if (v.iap) { btn = "★ " + Loc.Get("shop"); can = true; style = 0; }
+                    else if (locked) { btn = Loc.Get("atLevel", v.lvl); can = false; style = 0; }
+                    else { btn = Loc.Money(v.price); can = W >= v.price; style = 0; }
+                    var vv = v;
+                    Color sw = v.id == "foot" || v.id == "rocket" ? Art.Hex(v.col) : Art.Hex(sc.c1);
+                    Item(sw, v.id == "rocket" ? (Color?)Art.Hex("#f4f1ea") : null, Loc.Tx(v.name), Loc.Tx(v.desc) + " · " + Loc.Get("vSpeed", v.speed), -1, 0, btn, can, style, () =>
+                    {
+                        if (!Save.OwnedVeh(vv.id))
+                        {
+                            if (vv.iap) { OpenShop(true); return; }
+                            if (Save.Wallet < vv.price) return;
+                            Save.Wallet -= vv.price; Save.OwnVeh(vv.id);
+                            G.sfx.Arp(523, 659, 784);
+                            gToast.text = Loc.Get("bought", Loc.Tx(vv.name));
+                        }
+                        else G.sfx.Chime(660, .2f);
+                        Save.Vehicle = vv.id;
+                        G.ApplyLook();
+                        string keep = gToast.text; RenderGarage(); gToast.text = keep;
+                    }, false, locked);
+                }
+            }
+            else if (gTab == "up")
             {
                 foreach (var u in Data.Upgrades)
                 {
                     int lv = Save.Up(u.id), max = u.prices.Length;
-                    string extra = u.id == "speed" ? " (" + Data.Speeds[lv] + (lv < max ? " → " + Data.Speeds[lv + 1] : "") + ")"
-                        : u.id == "bag" ? " (" + Data.Bags[lv] + (lv < max ? " → " + Data.Bags[lv + 1] : "") + " " + Loc.Get("slots") + ")" : "";
+                    string extra = u.id == "bag" ? " (" + Data.Bags[lv] + (lv < max ? " → " + Data.Bags[lv + 1] : "") + " " + Loc.Get("slots") + ")" : "";
                     var uu = u;
                     Item(Art.Hex(u.col), null, Loc.Tx(u.name), Loc.Tx(u.desc) + extra, max > 1 ? lv : -1, max,
                         lv >= max ? Loc.Get("maxed") : Loc.Money(u.prices[lv]), lv < max && W >= u.prices[lv], lv >= max ? 1 : 0,
@@ -647,7 +719,7 @@ namespace CozyCourier
                 UI.LE(box, 96);
                 var sw = UI.Box(box.transform, Art.Hex(it.color), "sw");
                 UI.Place(sw.rectTransform, new Vector2(0, .5f), new Vector2(0, .5f), new Vector2(14, 0), new Vector2(58, 58));
-                var ic = UI.Label(sw.transform, it.consumable ? "+" : it.id == Shop.VIP ? "★" : "×", 30, Art.Hex("#14222a"), TextAnchor.MiddleCenter, FontStyle.Bold);
+                var ic = UI.Label(sw.transform, it.consumable ? "+" : it.id == Shop.VIP ? "★" : it.id == Shop.ROCKET ? "▲" : "×", 30, Art.Hex("#14222a"), TextAnchor.MiddleCenter, FontStyle.Bold);
                 UI.Fill(ic.rectTransform);
                 var t = UI.Label(box.transform, Loc.Get(it.nameKey) + (it.consumable ? "  <color=#ffcf8a>+" + Loc.Money(it.coins) + "</color>" : ""), 22, UI.Fg, TextAnchor.UpperLeft, FontStyle.Bold);
                 UI.Place(t.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(86, -12), new Vector2(520, 30));
@@ -1110,6 +1182,7 @@ namespace CozyCourier
             }
 
             if (view == View.Garage && Time.frameCount % 30 == 0) UpdateAdBtn();
+            UpdateGhost();
             if (view == View.Play) Markers();
             else if (markers.gameObject.activeSelf) foreach (var m in markerPool) m.gameObject.SetActive(false);
         }

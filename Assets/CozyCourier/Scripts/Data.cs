@@ -47,6 +47,9 @@ namespace CozyCourier
         public bool glasses, cane, apron, dress, bun, badge, vest;
     }
 
+    /// <summary>Transport: piyoda → velosiped → skuter → mini mashina → raketa (pullik).</summary>
+    public class Vehicle { public string id; public string[] name, desc; public int speed, price, lvl; public bool iap; public string col; }
+
     public class Upg { public string id; public string[] name, desc; public int[] prices; public string col; }
     public class LookItem { public string id; public string[] name; public string c0, c1; public int price, lvl; public bool ikat, vip; }
     public class Reno { public string id; public string[] name, desc; public int price; public string[][] lines; }
@@ -270,11 +273,18 @@ namespace CozyCourier
         };
 
         // ---------- Do'kon ----------
-        public static readonly int[] Speeds = { 140, 155, 170, 185 };
+        public static readonly Vehicle[] Vehicles =
+        {
+            new Vehicle{ id="foot", name=T("Piyoda","Пешком","On foot"), desc=T("Hamma shu yerdan boshlaydi","Все начинают отсюда","Everyone starts here"), speed=105, col="#c9b49a" },
+            new Vehicle{ id="bike", name=T("Velosiped","Велосипед","Bicycle"), desc=T("Yengil va jim","Лёгкий и тихий","Light and quiet"), speed=135, price=15000, lvl=1, col="#7ec8e3" },
+            new Vehicle{ id="scooter", name=T("Skuter","Скутер","Scooter"), desc=T("Haqiqiy kuryer transporti","Настоящий транспорт курьера","A real courier's ride"), speed=160, price=45000, lvl=2, col="#46d0bf" },
+            new Vehicle{ id="car", name=T("Mini mashina","Мини-машина","Mini car"), desc=T("Tomida yetkazish qutisi bilan","С коробом доставки на крыше","With a delivery box on the roof"), speed=185, price=120000, lvl=4, col="#f4a259" },
+            new Vehicle{ id="rocket", name=T("Raketa","Ракета","Rocket"), desc=T("Eng tez! Faqat do'konda","Самая быстрая! Только в магазине","The fastest! Shop only"), speed=230, iap=true, col="#e85d4a" },
+        };
+        public static Vehicle Veh(string id) { foreach (var v in Vehicles) if (v.id == id) return v; return Vehicles[0]; }
         public static readonly int[] Bags = { 3, 4, 5 };
         public static readonly Upg[] Upgrades =
         {
-            new Upg{ id="speed", name=T("Kuchli dvigatel","Мощный мотор","Stronger engine"), desc=T("Skuter tezroq yuradi","Скутер едет быстрее","The scooter goes faster"), prices=new[]{30000,60000,100000}, col="#ffd166" },
             new Upg{ id="bag", name=T("Katta sumka","Большая сумка","Bigger bag"), desc=T("Sumkaga ko'proq buyurtma sig'adi","Вмещает больше заказов","Carries more orders"), prices=new[]{40000,90000}, col="#f4a259" },
             new Upg{ id="nav", name=T("Navigator","Навигатор","Navigator"), desc=T("Butun yo'l chiziladi, YHXB postlarini aylanib o'tadi, ikkinchi buyurtma ham ko'rinadi","Весь маршрут, объезжает посты ДПС, видно и второй заказ","Full route that avoids police posts, plus your second order"), prices=new[]{50000}, col="#7ec8e3" },
             new Upg{ id="ins", name=T("Sug'urta","Страховка","Insurance"), desc=T("Barcha shtraflar ikki baravar kam","Все штрафы в два раза меньше","All fines are halved"), prices=new[]{70000}, col="#8fd6a8" },
@@ -282,7 +292,7 @@ namespace CozyCourier
         public static readonly string[] LookCats = { "scooter", "helmet", "bag" };
         public static readonly Dictionary<string, string[]> LookTitle = new Dictionary<string, string[]>
         {
-            {"scooter", T("Skuter","Скутер","Scooter")}, {"helmet", T("Shlem","Шлем","Helmet")}, {"bag", T("Sumka","Сумка","Bag")},
+            {"scooter", T("Transport rangi","Цвет транспорта","Vehicle colour")}, {"helmet", T("Shlem","Шлем","Helmet")}, {"bag", T("Sumka","Сумка","Bag")},
         };
         public static readonly Dictionary<string, LookItem[]> Looks = new Dictionary<string, LookItem[]>
         {

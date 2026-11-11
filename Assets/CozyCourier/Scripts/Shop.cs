@@ -27,11 +27,13 @@ namespace CozyCourier
     public static class Shop
     {
         public const string NO_ADS = "cozy_no_ads", VIP = "cozy_golden_pack",
+            ROCKET = "cozy_rocket",
             COIN_S = "cozy_coins_100k", COIN_M = "cozy_coins_300k", COIN_L = "cozy_coins_1m";
 
         public static readonly ShopItem[] Items =
         {
             new ShopItem { id = VIP, nameKey = "pVip", descKey = "pVipD", coins = 500000, fallbackPrice = "$4.99", color = "#e9c46a" },
+            new ShopItem { id = ROCKET, nameKey = "pRocket", descKey = "pRocketD", fallbackPrice = "$2.99", color = "#e85d4a" },
             new ShopItem { id = NO_ADS, nameKey = "pNoAds", descKey = "pNoAdsD", fallbackPrice = "$2.99", color = "#46d0bf" },
             new ShopItem { id = COIN_S, consumable = true, nameKey = "pCoinS", descKey = "pCoinD", coins = 100000, fallbackPrice = "$0.99", color = "#f4a259" },
             new ShopItem { id = COIN_M, consumable = true, nameKey = "pCoinM", descKey = "pCoinD", coins = 300000, fallbackPrice = "$1.99", color = "#ee9583" },
@@ -41,7 +43,7 @@ namespace CozyCourier
         /// <summary>Xarid tugaganda (muvaffaqiyatli yoki yo'q) — interfeysni yangilash uchun.</summary>
         public static event Action<string, bool> OnResult;
 
-        public static bool Owned(string id) => id == NO_ADS ? Save.NoAds : id == VIP ? Save.Vip : false;
+        public static bool Owned(string id) => id == NO_ADS ? Save.NoAds : id == VIP ? Save.Vip : id == ROCKET ? Save.Rocket : false;
 
         /// <summary>Mahsulotni o'yinchiga beradi (do'kon tasdiqlagandan keyin).</summary>
         static void Grant(string id)
@@ -50,6 +52,7 @@ namespace CozyCourier
             foreach (var it in Items) if (it.id == id) item = it;
             if (item == null) { Debug.LogWarning("[Shop] Noma'lum mahsulot: " + id); return; }
             if (id == NO_ADS) Save.NoAds = true;
+            else if (id == ROCKET) { if (!Save.Rocket) { Save.Rocket = true; Save.Vehicle = "rocket"; } }
             else if (id == VIP)
             {
                 if (Save.Vip) return; // ikki marta berilmasin (tiklashda)
@@ -109,7 +112,7 @@ namespace CozyCourier
                         foreach (var item in o.CartOrdered.Items())
                         {
                             string id = item.Product.definition.id;
-                            if (id == NO_ADS || id == VIP) Grant(id);
+                            if (id == NO_ADS || id == VIP || id == ROCKET) Grant(id);
                         }
                     Report("", true);
                 };

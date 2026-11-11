@@ -117,8 +117,17 @@ namespace CozyCourier
         string inX;
         Transform courier, courierBody;
         SortingGroup courierSG;
-        Quad arrow, headlight, scooterSr, scooterTopSr, riderSr, helmetSr, bagSr, bagTopSr;
-        readonly List<Quad> ikat = new List<Quad>();
+        Quad arrow, headlight, courierShadow, footL, footR, flame, flameIn;
+        readonly List<Quad> bodyParts = new List<Quad>();
+        readonly List<Color> bodyBase = new List<Color>();
+        string vehId = "";
+
+        // ko'rinmas rejim (reklama orqali): mashinalar va svetoforlar sezmaydi
+        public const float GHOST_TIME = 45f;
+        public const int GHOST_PER_SHIFT = 2;
+        public float ghost;
+        public int ghostUses;
+        public bool Ghost => ghost > 0;
         readonly List<Quad> dust = new List<Quad>();
         readonly List<float> dustLife = new List<float>();
         int dustIdx;
@@ -384,24 +393,10 @@ namespace CozyCourier
             courier = new GameObject("Courier").transform;
             courier.SetParent(worldRoot, false);
             courierSG = courier.gameObject.AddComponent<SortingGroup>();
-            Art.Spr(courier, Art.Circle, 4, 5, 36, 20, new Color(.06f, .09f, .13f, .32f), 0, "Shadow");
+            courierShadow = Art.Spr(courier, Art.Circle, 4, 5, 36, 20, new Color(.06f, .09f, .13f, .32f), 0, "Shadow");
             courierBody = new GameObject("Body").transform;
             courierBody.SetParent(courier, false);
             courierBody.localPosition = Art.W(0, -6);
-            var tyre = Art.Hex("#1e1e1e");
-            Art.Spr(courierBody, Art.Square, 13.5f, 0, 9, 7, tyre, 1);
-            Art.Spr(courierBody, Art.Square, -13.5f, 0, 9, 7, tyre, 1);
-            scooterSr = Art.Spr(courierBody, Art.Square, 1, 0, 26, 14, Color.white, 2, "Scooter");
-            scooterTopSr = Art.Spr(courierBody, Art.Square, 1, -3, 22, 4, Color.white, 3);
-            Art.Spr(courierBody, Art.Square, 12, 0, 4, 12, Art.Hex("#d8eeea"), 3);
-            Art.Spr(courierBody, Art.Circle, 15, 0, 4.4f, 4.4f, Art.Hex("#fff6c8"), 4);
-            riderSr = Art.Spr(courierBody, Art.Square, -1, 0, 10, 16, Color.white, 4, "Rider");
-            bagSr = Art.Spr(courierBody, Art.Square, -15, 0, 16, 16, Color.white, 5, "Bag");
-            bagTopSr = Art.Spr(courierBody, Art.Square, -15, -6, 16, 4, Color.white, 6);
-            string[] ik = { "#e85d75", "#ffd166", "#3d7fd0", "#8fd6a8" };
-            for (int i = 0; i < 4; i++) ikat.Add(Art.Spr(courierBody, Art.Square, -15, -6 + i * 4, 16, 4, Art.Hex(ik[i]), 6, "Ikat"));
-            helmetSr = Art.Spr(courierBody, Art.Circle, 2, 0, 13, 13, Color.white, 7, "Helmet");
-            Art.Spr(courierBody, Art.Circle, 5, 0, 6, 6, Art.Hex("#2b3a44"), 8, "Visor");
             ApplyLook();
 
             var dustRoot = new GameObject("Dust").transform;
@@ -432,19 +427,159 @@ namespace CozyCourier
             route2.positionCount = 0;
         }
 
-        /// <summary>Garajda tanlangan ranglarni skuter va kuryerga qo'llaydi.</summary>
+        /// <summary>Garajda tanlangan transport va ranglarni kuryerga qo'llaydi (tanani qaytadan chizadi).</summary>
         public void ApplyLook()
         {
+            vehId = Save.Vehicle;
+            if (!Save.OwnedVeh(vehId)) { vehId = "foot"; Save.Vehicle = "foot"; }
+            speed = Data.Veh(vehId).speed;
+            BuildBody();
+        }
+
+        Quad P(Sprite sp, float x, float y, float w, float h, Color c, int order, string name = "part")
+        {
+            var q = Art.Spr(courierBody, sp, x, y, w, h, c, order, name);
+            bodyParts.Add(q); bodyBase.Add(c);
+            return q;
+        }
+
+        /// <summary>Kuryer tanasi: x — oldinga (harakat yo'nalishi), y — eniga. Har bir transport o'zicha.</summary>
+        void BuildBody()
+        {
+            if (courierBody == null) return;
+            for (int i = courierBody.childCount - 1; i >= 0; i--) Destroy(courierBody.GetChild(i).gameObject);
+            bodyParts.Clear(); bodyBase.Clear();
+            footL = footR = flame = flameIn = null;
+
             var sc = Data.Look("scooter", Save.Equipped("scooter"));
             var hc = Data.Look("helmet", Save.Equipped("helmet"));
             var bg = Data.Look("bag", Save.Equipped("bag"));
-            scooterSr.color = Art.Hex(sc.c1);
-            scooterTopSr.color = Art.Hex(sc.c0);
-            riderSr.color = Art.Shade(Art.Hex(sc.c1), -.1f);
-            helmetSr.color = Art.Hex(hc.c0);
-            bagSr.color = Art.Hex(bg.c1);
-            bagTopSr.color = Art.Hex(bg.c0);
-            foreach (var s in ikat) s.enabled = bg.ikat;
+            Color c0 = Art.Hex(sc.c0), c1 = Art.Hex(sc.c1), h0 = Art.Hex(hc.c0), h1 = Art.Hex(hc.c1), b0 = Art.Hex(bg.c0), b1 = Art.Hex(bg.c1);
+            var tyre = Art.Hex("#1e1e1e");
+            var jacket = Art.Shade(c1, -.1f);
+            var skin = Art.Hex("#e0a782");
+            string[] ik = { "#e85d75", "#ffd166", "#3d7fd0", "#8fd6a8" };
+
+            void Bag(float x, float w, float h, int order)
+            {
+                P(Art.Square, x, 0, w, h, b1, order, "Bag");
+                P(Art.Square, x, -h / 2 + 2, w, 4, b0, order + 1);
+                if (bg.ikat) for (int i = 0; i < 4; i++) P(Art.Square, x, -h / 2 + 2 + i * (h / 4), w, h / 4, Art.Hex(ik[i]), order + 1, "Ikat");
+            }
+            void Helmet(float x, float d, int order)
+            {
+                P(Art.Circle, x, 0, d, d, h0, order, "Helmet");
+                P(Art.Circle, x + d * .25f, 0, d * .45f, d * .45f, Art.Hex("#2b3a44"), order + 1, "Visor");
+            }
+
+            float shW = 36, shH = 20, shX = 4, shY = 5;
+            switch (vehId)
+            {
+                case "foot":
+                    footL = P(Art.Square, 0, -3.5f, 6, 4, Art.Hex("#2a2422"), 1, "FootL");
+                    footR = P(Art.Square, 0, 3.5f, 6, 4, Art.Hex("#2a2422"), 1, "FootR");
+                    P(Art.Circle, -1, 0, 10, 17, jacket, 3, "Body");
+                    Bag(-6.5f, 8, 12, 4);
+                    P(Art.Circle, 1.5f, 0, 9, 9, skin, 6, "Head");
+                    P(Art.Circle, 1, 0, 9, 9, h0, 7, "Cap");
+                    P(Art.Square, 5, 0, 3, 7, h1, 7, "Peak");
+                    shW = 16; shH = 14; shX = 2; shY = 4;
+                    break;
+                case "bike":
+                    P(Art.Square, 12, 0, 10, 3, tyre, 1); P(Art.Square, -12, 0, 10, 3, tyre, 1);
+                    P(Art.Square, 0, 0, 22, 2.6f, c1, 2, "Frame");
+                    P(Art.Square, 9, 0, 2.2f, 13, Art.Hex("#3a3a3a"), 3, "Bar");
+                    P(Art.Circle, 13.5f, 0, 3.4f, 3.4f, Art.Hex("#fff6c8"), 3);
+                    Bag(-12, 11, 11, 4);
+                    P(Art.Circle, -1, 0, 9, 15, jacket, 6, "Rider");
+                    Helmet(1.5f, 10, 7);
+                    shW = 32; shH = 12; shX = 3; shY = 4;
+                    break;
+                case "car":
+                    foreach (float wx in new[] { -10.5f, 10.5f }) foreach (float wy in new[] { -10.5f, 10.5f }) P(Art.Square, wx, wy, 8, 4, tyre, 1);
+                    P(Art.Square, 0, 0, 36, 21, Art.Shade(c1, -.25f), 2, "Under");
+                    P(Art.Square, .5f, -.5f, 34, 19, c1, 3, "Body");
+                    P(Art.Square, 11, 0, 9, 15, Art.Shade(c1, .12f), 4, "Hood");
+                    P(Art.Square, 5, 0, 5, 16, Art.Hex("#2b3d50"), 4, "Glass");
+                    P(Art.Square, -3, 0, 12, 16, c0, 4, "Roof");
+                    P(Art.Square, -10.5f, 0, 3, 15, Art.Hex("#2b3d50"), 4, "Rear");
+                    P(Art.Circle, 17, -6, 3.4f, 3.4f, Art.Hex("#fff6c8"), 5); P(Art.Circle, 17, 6, 3.4f, 3.4f, Art.Hex("#fff6c8"), 5);
+                    P(Art.Square, -17.3f, -6, 1.6f, 4, Art.Hex("#d9453a"), 5); P(Art.Square, -17.3f, 6, 1.6f, 4, Art.Hex("#d9453a"), 5);
+                    Bag(-3, 10, 12, 6); // tomdagi yetkazish qutisi
+                    shW = 42; shH = 26; shX = 4; shY = 6;
+                    break;
+                case "rocket":
+                    flame = P(Art.Circle, -21, 0, 16, 9, Art.Hex("#ff9f43"), 1, "Flame");
+                    flameIn = P(Art.Circle, -19, 0, 9, 5, Art.Hex("#ffe08a"), 2, "FlameIn");
+                    P(Art.Square, -12, -8, 9, 5, Art.Hex("#c0443a"), 2, "Fin"); P(Art.Square, -12, 8, 9, 5, Art.Hex("#c0443a"), 2, "Fin");
+                    P(Art.Circle, 0, 0, 36, 15, Art.Hex("#f4f1ea"), 3, "Hull");
+                    P(Art.Circle, -1, 2.5f, 30, 8, Art.Hex("#d9d4ca"), 3, "HullShade");
+                    var nose = P(Art.Tri, 18, 0, 10, 11, Art.Hex("#e85d4a"), 4, "Nose");
+                    P(Art.Square, -8, 0, 4, 13, Art.Hex("#e85d4a"), 4, "Stripe");
+                    P(Art.Circle, 6, 0, 9, 9, Art.Hex("#7ec8e3"), 5, "Window");
+                    P(Art.Circle, 5.5f, 0, 5.5f, 5.5f, h0, 6, "Pilot");
+                    P(Art.Circle, 8, -2, 2.5f, 2.5f, new Color(1, 1, 1, .7f), 7);
+                    shW = 34; shH = 12; shX = 8; shY = 14;
+                    break;
+                default: // skuter
+                    P(Art.Square, 13.5f, 0, 9, 7, tyre, 1); P(Art.Square, -13.5f, 0, 9, 7, tyre, 1);
+                    P(Art.Square, 1, 0, 26, 14, c1, 2, "Scooter");
+                    P(Art.Square, 1, -3, 22, 4, c0, 3);
+                    P(Art.Square, 12, 0, 4, 12, Art.Hex("#d8eeea"), 3);
+                    P(Art.Circle, 15, 0, 4.4f, 4.4f, Art.Hex("#fff6c8"), 4);
+                    P(Art.Square, -1, 0, 10, 16, jacket, 4, "Rider");
+                    Bag(-15, 16, 16, 5);
+                    Helmet(2, 13, 7);
+                    break;
+            }
+            courierShadow.transform.localPosition = Art.W(shX, shY);
+            courierShadow.transform.localScale = new Vector3(shW * Art.K, shH * Art.K, 1);
+        }
+
+        /// <summary>Oyoqlar qadami, raketa alangasi, ko'rinmas rejimdagi shaffoflik.</summary>
+        void AnimateBody(bool moving)
+        {
+            if (footL != null)
+            {
+                float st = moving ? Mathf.Sin(bob * .8f) * 4.5f : 0;
+                footL.transform.localPosition = Art.W(st, -3.5f);
+                footR.transform.localPosition = Art.W(-st, 3.5f);
+            }
+            if (flame != null)
+            {
+                float f = moving ? 1f + Mathf.Sin(Time.time * 40f) * .18f : .55f;
+                flame.transform.localScale = new Vector3(16 * f * Art.K, 9 * (0.8f + .2f * f) * Art.K, 1);
+                flame.transform.localPosition = Art.W(-14 - 7 * f, 0);
+                flameIn.transform.localScale = new Vector3(9 * f * Art.K, 5 * Art.K, 1);
+                flameIn.transform.localPosition = Art.W(-14 - 4.5f * f, 0);
+            }
+            float a = 1f;
+            if (Ghost)
+            {
+                a = .38f + .14f * Mathf.Sin(Time.time * 6f);
+                if (ghost < 5f && Mathf.FloorToInt(Time.time * 6f) % 2 == 0) a = .75f; // tugashidan oldin ogohlantirish
+            }
+            for (int i = 0; i < bodyParts.Count; i++)
+            {
+                var b = bodyBase[i];
+                bodyParts[i].color = Ghost ? new Color(Mathf.Lerp(b.r, .7f, .35f), Mathf.Lerp(b.g, .9f, .35f), Mathf.Lerp(b.b, 1f, .35f), b.a * a) : b;
+            }
+            var shc = courierShadow.color; shc.a = Ghost ? .12f : .32f; courierShadow.color = shc;
+        }
+
+        /// <summary>Ko'rinmas rejimni yoqish: reklama ko'rilgandan keyin (yoki «Reklamasiz» bo'lsa darhol).</summary>
+        public void TryGhost()
+        {
+            if (state != St.Play || Ghost || ghostUses >= GHOST_PER_SHIFT) return;
+            SetPause(true);
+            Ads.ShowRewarded(ok =>
+            {
+                if (state == St.Pause) SetPause(false);
+                if (!ok) { hud.Toast(Loc.Get("adFail"), UI.Warn); return; }
+                ghost = GHOST_TIME; ghostUses++; inv = 0;
+                sfx.Arp(659, 880, 1175);
+                hud.Toast(Loc.Get("ghostOn"), UI.Teal);
+            });
         }
 
         void BuildNight()
@@ -519,7 +654,8 @@ namespace CozyCourier
             rating = 5f; holdT = 0;
             lvlUps.Clear();
             nextId = 1; spawnT = 2f;
-            speed = Data.Speeds[Mathf.Clamp(Save.Up("speed"), 0, Data.Speeds.Length - 1)];
+            speed = Data.Veh(Save.Vehicle).speed;
+            ghost = 0; ghostUses = 0;
             bagMax = Data.Bags[Mathf.Clamp(Save.Up("bag"), 0, Data.Bags.Length - 1)];
             ins = Save.Up("ins") > 0; nav = Save.Up("nav") > 0;
             mult = city.D.mult;
@@ -642,6 +778,7 @@ namespace CozyCourier
             var u = new List<string>();
             foreach (var e in Data.Extra) if (e.lvl == L) u.Add(Loc.Get("restU", Loc.Tx(e.name)));
             foreach (var id in Data.DistrictOrder) { var d = Data.Districts[id]; if (d.lvl == L && L > 1) u.Add(Loc.Get("distU", Loc.Tx(d.name))); }
+            foreach (var v in Data.Vehicles) if (v.lvl == L && !v.iap && L > 0) u.Add(Loc.Get("vehU", Loc.Tx(v.name)));
             foreach (var cat in Data.LookCats) foreach (var it in Data.Looks[cat]) if (it.lvl == L) u.Add(Loc.Tx(it.name) + " (" + Loc.Tx(Data.LookTitle[cat]).ToLower() + ")");
             return string.Join(", ", u);
         }
@@ -808,6 +945,11 @@ namespace CozyCourier
             }
             if (story != null && !storySpawned && shiftLen - time >= 10) SpawnStory();
             if (stun > 0) stun -= dt;
+            if (ghost > 0)
+            {
+                ghost -= dt;
+                if (ghost <= 0) { ghost = 0; hud.Toast(Loc.Get("ghostEnd"), UI.Muted); sfx.Chime(392, .3f); }
+            }
             if (inv > 0) inv -= dt;
             foreach (var g in gais) if (g.alert > 0) g.alert -= dt;
 
@@ -1021,7 +1163,7 @@ namespace CozyCourier
             int c = Mathf.FloorToInt(pos.x / CELL), r = Mathf.FloorToInt(pos.y / CELL);
             bool inSq = pos.x - c * CELL < 60 && pos.y - r * CELL < 60;
             string key = inSq ? c + "," + r : null;
-            if (key != null && key != inX)
+            if (key != null && key != inX && !Ghost)
             {
                 var L = LightAt(c, r);
                 if (L != null && mv.sqrMagnitude > 0)
@@ -1069,7 +1211,7 @@ namespace CozyCourier
                 if (c.p < -30) c.p = lim + 30;
                 if (!collide) continue;
                 float cx = c.h ? c.p : c.lane, cy = c.h ? c.lane : c.p, hw = c.h ? 18 : 10, hh = c.h ? 10 : 18;
-                if (inv <= 0 && c.cur > 8 && Mathf.Abs(cx - pos.x) < hw + 8 && Mathf.Abs(cy - pos.y) < hh + 8)
+                if (!Ghost && inv <= 0 && c.cur > 8 && Mathf.Abs(cx - pos.x) < hw + 8 && Mathf.Abs(cy - pos.y) < hh + 8)
                 {
                     int fine = Fine(FINE_CAR);
                     stun = ins ? .3f : .6f; inv = 2.5f; hits++; fines += fine;
@@ -1145,11 +1287,12 @@ namespace CozyCourier
                 courierSG.sortingOrder = 1000 + (int)pos.y;
                 bool blink = inv > 0 && Mathf.FloorToInt(Time.time * 8f) % 2 == 0;
                 courierBody.gameObject.SetActive(!blink);
+                AnimateBody(moving);
                 headlight.transform.localPosition = Art.W(pos.x + Mathf.Cos(ang) * 34, pos.y + Mathf.Sin(ang) * 34);
                 headlight.color = new Color(1, .94f, .8f, .45f * nk);
                 // chang izi
                 dustT -= dt;
-                if (moving && dustT <= 0 && state == St.Play)
+                if (moving && dustT <= 0 && state == St.Play && vehId != "foot")
                 {
                     dustT = .05f;
                     var s = dust[dustIdx];
@@ -1166,7 +1309,7 @@ namespace CozyCourier
                 float l = Mathf.Max(0, dustLife[i]);
                 float sz = (4 + (.5f - l) * 10) * 2;
                 dust[i].transform.localScale = new Vector3(sz * Art.K, sz * Art.K, 1);
-                dust[i].color = new Color(.94f, .92f, .86f, l * .35f);
+                dust[i].color = vehId == "rocket" ? new Color(1f, .62f + .3f * l, .3f, l * .55f) : new Color(.94f, .92f, .86f, l * .35f);
             }
 
             // kecha

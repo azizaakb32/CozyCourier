@@ -24,6 +24,28 @@ namespace CozyCourier
         public static bool NoAds { get => GI("iap_noads") == 1; set => SI("iap_noads", value ? 1 : 0); }
         public static bool Vip { get => GI("iap_vip") == 1; set => SI("iap_vip", value ? 1 : 0); }
 
+        public static bool Rocket { get => GI("iap_rocket") == 1; set => SI("iap_rocket", value ? 1 : 0); }
+
+        /// <summary>Tanlangan transport. Eski o'yinchilar (skuter bilan boshlaganlar) skuterda qoladi.</summary>
+        public static string Vehicle
+        {
+            get
+            {
+                string v = GS("veh", "");
+                if (v.Length > 0) return v;
+                if (XP > 0 || Up("speed") > 0)
+                {
+                    OwnVeh("bike"); OwnVeh("scooter");
+                    if (Up("speed") >= 2) OwnVeh("car");
+                    SS("veh", "scooter"); return "scooter";
+                }
+                return "foot";
+            }
+            set => SS("veh", value);
+        }
+        public static bool OwnedVeh(string id) => id == "foot" || (id == "rocket" ? Rocket : GI("veh_" + id) == 1);
+        public static void OwnVeh(string id) => SI("veh_" + id, 1);
+
         public static int Up(string id) => GI("up_" + id);
         public static void SetUp(string id, int v) => SI("up_" + id, v);
         public static bool Owned(string cat, string id) => Data.Looks[cat][0].id == id || GI("own_" + cat + "_" + id) == 1;
@@ -42,9 +64,10 @@ namespace CozyCourier
         /// <summary>Hamma natijani o'chiradi, lekin til va ovoz sozlamalarini qoldiradi.</summary>
         public static void ResetAll()
         {
-            int lang = Lang; bool music = Music, sfx = Sfx, noAds = NoAds, vip = Vip;
+            int lang = Lang; bool music = Music, sfx = Sfx, noAds = NoAds, vip = Vip, rocket = Rocket;
             PlayerPrefs.DeleteAll();
-            Lang = lang; Music = music; Sfx = sfx; NoAds = noAds; Vip = vip;
+            Lang = lang; Music = music; Sfx = sfx; NoAds = noAds; Vip = vip; Rocket = rocket;
+            Vehicle = "foot";
             if (vip) Own("scooter", "gold");
         }
     }
