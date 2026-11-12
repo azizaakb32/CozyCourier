@@ -128,6 +128,18 @@ namespace CozyCourier
         public float ghost;
         public int ghostUses;
         public bool Ghost => ghost > 0;
+
+        // o'rgatish (birinchi smena) va smena yulduzlari
+        public int tut = -1;
+        float tutDist, tutT;
+        public int lastStars;
+        public readonly List<int> lvlRewards = new List<int>();
+
+        // hamroh (mushuk / kuchukcha)
+        Transform pet, petBody;
+        SortingGroup petSG;
+        Vector2 petPos; float petAng, petBob;
+        string petId = "";
         readonly List<Quad> dust = new List<Quad>();
         readonly List<float> dustLife = new List<float>();
         int dustIdx;
@@ -145,9 +157,29 @@ namespace CozyCourier
         float LT, uiTick;
 
         // ========================= ISHGA TUSHIRISH =========================
+        // boshqa oqimlardan (bulut, reklama) kelgan ishlarni asosiy oqimda bajarish
+        static readonly Queue<Action> mainQ = new Queue<Action>();
+        public static void OnMain(Action a) { if (a == null) return; lock (mainQ) mainQ.Enqueue(a); }
+
+        void OnApplicationPause(bool paused)
+        {
+            if (paused) { Notify.ScheduleAll(); Cloud.Upload(); }
+            else Notify.CancelAll();
+        }
+        void OnApplicationQuit() { Notify.ScheduleAll(); }
+
         void Awake()
         {
             I = this;
+            Cloud.OnImported += () =>
+            {
+                // bulutdan yangiroq natija keldi: ko'rinishni yangilaymiz
+                if (state != St.Menu) return;
+                BuildWorld(Save.District);
+                ApplyLook();
+                hud.Rebuild();
+            };
+            Daily.OnTaskDone += t => { if (hud != null && state == St.Play) { hud.Toast(Loc.Get("taskDone", Daily.Text(t)), UI.Gold); sfx.Arp(659, 784, 988); } };
             Application.targetFrameRate = 60;
             Screen.sleepTimeout = SleepTimeout.NeverSleep;
             Loc.L = Mathf.Clamp(Save.Lang, 0, 2);
@@ -182,6 +214,8 @@ namespace CozyCourier
             cut = gameObject.AddComponent<Cutscene>();
             Ads.Init();
             Shop.Init();
+            Notify.Init();
+            Cloud.Init();
             ShowMenu();
             hud.ShowSplash();
         }
@@ -434,6 +468,7 @@ namespace CozyCourier
             if (!Save.OwnedVeh(vehId)) { vehId = "foot"; Save.Vehicle = "foot"; }
             speed = Data.Veh(vehId).speed;
             BuildBody();
+            BuildPet();
         }
 
         Quad P(Sprite sp, float x, float y, float w, float h, Color c, int order, string name = "part")
@@ -567,6 +602,62 @@ namespace CozyCourier
             var shc = courierShadow.color; shc.a = Ghost ? .12f : .32f; courierShadow.color = shc;
         }
 
+        // ---------------------------------------------------------------- hamroh
+        void BuildPet()
+        {
+            if (pet == null)
+            {
+                pet = new GameObject("Pet").transform;
+                pet.SetParent(worldRoot, false);
+                petSG = pet.gameObject.AddComponent<SortingGroup>();
+                petBody = new GameObject("PetBody").transform;
+                petBody.SetParent(pet, false);
+            }
+            petId = Save.Equipped("pet");
+            for (int i = petBody.childCount - 1; i >= 0; i--) Destroy(petBody.GetChild(i).gameObject);
+            for (int i = pet.childCount - 1; i >= 0; i--) if (pet.GetChild(i) != petBody) Destroy(pet.GetChild(i).gameObject);
+            pet.gameObject.SetActive(petId != "none");
+            if (petId == "none") return;
+            var lk = Data.Look("pet", petId);
+            Color c0 = Art.Hex(lk.c0), c1 = Art.Hex(lk.c1);
+            bool dog = petId == "dog";
+            Art.Spr(pet, Art.Circle, 1, 3, dog ? 20 : 16, dog ? 11 : 9, new Color(.06f, .09f, .13f, .28f), 0, "Shadow");
+            // dum
+            var tail = Art.Spr(petBody, Art.Square, dog ? -10 : -11, 0, dog ? 6 : 10, 2.4f, c1, 1, "Tail");
+            tail.transform.localRotation = Quaternion.Euler(0, 0, dog ? 0 : 25);
+            Art.Spr(petBody, Art.Circle, -1, 0, dog ? 17 : 14, dog ? 10 : 8.5f, c0, 2, "Body");
+            if (petId == "cat") for (int i = 0; i < 3; i++) Art.Spr(petBody, Art.Square, -5 + i * 3.5f, 0, 1.4f, 7, c1, 3, "Stripe");
+            Art.Spr(petBody, Art.Circle, dog ? 8 : 7, 0, dog ? 9 : 8.5f, dog ? 8.5f : 8.5f, c0, 4, "Head");
+            if (dog)
+            {
+                Art.Spr(petBody, Art.Circle, 7, -4.5f, 4, 5.5f, c1, 5, "Ear"); Art.Spr(petBody, Art.Circle, 7, 4.5f, 4, 5.5f, c1, 5, "Ear");
+                Art.Spr(petBody, Art.Circle, 12.5f, 0, 3, 3, Art.Hex("#2a1c18"), 5, "Nose");
+            }
+            else
+            {
+                var e1 = Art.Spr(petBody, Art.Tri, 6, -3.6f, 4, 3.6f, c1, 5, "Ear"); e1.transform.localRotation = Quaternion.Euler(0, 0, 70);
+                var e2 = Art.Spr(petBody, Art.Tri, 6, 3.6f, 4, 3.6f, c1, 5, "Ear"); e2.transform.localRotation = Quaternion.Euler(0, 0, -70);
+                Art.Spr(petBody, Art.Circle, 11, 0, 1.6f, 1.6f, Art.Hex("#e88a8a"), 5, "Nose");
+            }
+        }
+
+        void UpdatePet(float dt, bool moving)
+        {
+            if (pet == null || petId == "none" || !pet.gameObject.activeSelf) return;
+            // kuryer orqasidan ergashadi
+            var back = pos - new Vector2(Mathf.Cos(ang), Mathf.Sin(ang)) * (vehId == "car" ? 30 : 24) + new Vector2(-Mathf.Sin(ang), Mathf.Cos(ang)) * 4;
+            var d = back - petPos;
+            if (d.sqrMagnitude > 140 * 140) petPos = back; // juda uzoqlashsa (masalan, smena boshida) yoniga o'tadi
+            petPos += d * Mathf.Min(1, dt * 7f);
+            bool pm = d.magnitude > 2f;
+            if (pm) petAng = Mathf.LerpAngle(petAng * Mathf.Rad2Deg, Mathf.Atan2(d.y, d.x) * Mathf.Rad2Deg, Mathf.Min(1, dt * 10)) * Mathf.Deg2Rad;
+            petBob += dt * (pm ? 18f : 3f);
+            float hop = pm ? Mathf.Abs(Mathf.Sin(petBob)) * 2.2f : 0;
+            pet.localPosition = Art.W(petPos.x, petPos.y - hop);
+            petBody.localRotation = Quaternion.Euler(0, 0, -petAng * Mathf.Rad2Deg);
+            petSG.sortingOrder = 1000 + (int)petPos.y;
+        }
+
         /// <summary>Ko'rinmas rejimni yoqish: reklama ko'rilgandan keyin (yoki «Reklamasiz» bo'lsa darhol).</summary>
         public void TryGhost()
         {
@@ -577,6 +668,7 @@ namespace CozyCourier
                 if (state == St.Pause) SetPause(false);
                 if (!ok) { hud.Toast(Loc.Get("adFail"), UI.Warn); return; }
                 ghost = GHOST_TIME; ghostUses++; inv = 0;
+                Daily.Track("ghost");
                 sfx.Arp(659, 880, 1175);
                 hud.Toast(Loc.Get("ghostOn"), UI.Teal);
             });
@@ -616,6 +708,7 @@ namespace CozyCourier
         public void ShowMenu()
         {
             state = St.Menu;
+            Weather.Clear();
             storyMode = false;
             ClearOrders();
             courier.gameObject.SetActive(false);
@@ -656,16 +749,23 @@ namespace CozyCourier
             nextId = 1; spawnT = 2f;
             speed = Data.Veh(Save.Vehicle).speed;
             ghost = 0; ghostUses = 0;
+            lvlRewards.Clear();
+            tut = Save.TutDone ? -1 : 0; tutDist = 0; tutT = 0;
             bagMax = Data.Bags[Mathf.Clamp(Save.Up("bag"), 0, Data.Bags.Length - 1)];
             ins = Save.Up("ins") > 0; nav = Save.Up("nav") > 0;
-            mult = city.D.mult;
+            Weather.Roll();
+            mult = city.D.mult * Weather.PayBonus;
             pos = new Vector2(3 * CELL + 30, 2 * CELL + 30);
             ang = 0; stun = 0; inv = 0; mv = Vector2.zero; inX = "3,2";
             foreach (var c in cars) { c.p = c.startP; c.cur = c.v; }
             ApplyLook();
             courier.gameObject.SetActive(true);
+            petPos = pos - new Vector2(24, 0);
             state = St.Play;
             hud.ShowPlay();
+            if (Weather.Navruz) hud.Toast(Loc.Get("navruz"), UI.Gold);
+            else if (Weather.NewYear) hud.Toast(Loc.Get("newyear"), UI.Gold);
+            else if (Weather.LocKey != null) hud.Toast(Loc.Get(Weather.LocKey), UI.Teal);
             SnapCamera();
         }
 
@@ -701,7 +801,19 @@ namespace CozyCourier
         void EndShift()
         {
             state = St.End;
+            // yulduzlar: smena uzunligiga qarab yetkazilgan buyurtmalar soni
+            float k = shiftLen / FREE_SHIFT;
+            lastStars = done >= Mathf.CeilToInt(10 * k) ? 3 : done >= Mathf.CeilToInt(6 * k) ? 2 : done >= Mathf.CeilToInt(3 * k) ? 1 : 0;
+            Daily.Track("shift");
+            if (fines == 0 && done > 0) Daily.Track("clean");
+            if (lastStars >= 3) Daily.Track("stars3");
+            if (tut >= 0) { tut = -1; Save.TutDone = true; }
             int net = Bank();
+            Save.PlayTime = Save.PlayTime + Mathf.RoundToInt(shiftLen);
+            Save.TotalDone = Save.TotalDone + done;
+            Save.TotalEarned = Save.TotalEarned + Mathf.Max(0, money);
+            Cloud.AfterShift(done, fines, lastStars);
+            Notify.AskPermission();
             bool rec = net > Save.Best && net > 0;
             if (rec) Save.Best = net;
             ClearOrders();
@@ -786,6 +898,13 @@ namespace CozyCourier
         // ========================= KADR =========================
         void Update()
         {
+            while (true)
+            {
+                Action job = null;
+                lock (mainQ) { if (mainQ.Count > 0) job = mainQ.Dequeue(); }
+                if (job == null) break;
+                try { job(); } catch (Exception e) { Debug.LogException(e); }
+            }
             float dt = Mathf.Min(Time.deltaTime, 0.05f);
             if (BackPressed())
             {
@@ -964,6 +1083,7 @@ namespace CozyCourier
                 if (pos != old)
                 {
                     moving = true;
+                    if (tut == 0) { tutDist += (pos - old).magnitude; if (tutDist > 90) tut = 1; }
                     mv = pos - old;
                     float ta = Mathf.Atan2(mv.y, mv.x);
                     float da = Mathf.DeltaAngle(ang * Mathf.Rad2Deg, ta * Mathf.Rad2Deg) * Mathf.Deg2Rad;
@@ -972,6 +1092,7 @@ namespace CozyCourier
                 bob += dt * 14f;
             }
 
+            if (tut == 3) { tutT += dt; if (tutT > 6f) { tut = -1; Save.TutDone = true; } }
             CheckRedLight();
             if (state != St.Play) return;
             StepCars(dt, true);
@@ -993,6 +1114,7 @@ namespace CozyCourier
                     if (o.story || inBag < bagMax)
                     {
                         o.picked = true; if (!o.story) inBag++;
+                        if (tut >= 0 && tut <= 1) tut = 2;
                         sfx.Chime(659, .4f);
                         AddFx(o.rest.door + new Vector2(0, -30), Loc.Get("picked"), Color.white);
                     }
@@ -1011,6 +1133,9 @@ namespace CozyCourier
                         rating = Mathf.Min(5, rating + .1f);
                     }
                     money += o.pay + tip; tips += tip; done++;
+                    Daily.Track("deliver"); Daily.Track("earn", o.pay + tip);
+                    if (tip > 0 && !o.story) Daily.Track("tip");
+                    if (tut >= 0 && tut <= 2) { tut = 3; tutT = 0; }
                     sfx.Chime(784, .35f); sfx.Arp(1047);
                     string s = "+" + Loc.Num(o.pay + tip) + (o.story ? Loc.Get("withGift") : tip > 0 ? Loc.Get("withTip") : "") + (fine > 0 ? "  (−" + Loc.Num(fine) + ")" : "");
                     AddFx(o.house.door + new Vector2(0, -34), s, o.story ? GOLD : fine > 0 ? UI.Warn : UI.Ok);
@@ -1038,9 +1163,11 @@ namespace CozyCourier
             int after = Save.Level;
             if (after > before)
             {
-                lvlUps.Add(after);
+                int reward = 0;
+                for (int L = before + 1; L <= after; L++) { lvlUps.Add(L); int r = Save.LevelReward(L); lvlRewards.Add(r); reward += r; }
+                Save.Wallet += reward;
                 string u = UnlockText(after);
-                hud.Toast(Loc.Get("newLevel", after) + (u.Length > 0 ? " " + Loc.Get("unlocked", u) : ""), UI.Teal);
+                hud.Toast(Loc.Get("newLevel", after) + " · " + Loc.Get("lvlReward", Loc.Money(reward)) + (u.Length > 0 ? " " + Loc.Get("unlocked", u) : ""), UI.Teal);
                 sfx.Arp(523, 659, 784, 1047);
             }
         }
@@ -1277,6 +1404,7 @@ namespace CozyCourier
                 g.zone.startColor = g.zone.endColor = new Color(.55f, .77f, 1f, a);
             }
 
+            if (pet != null) { bool pa = petId != "none" && courier.gameObject.activeSelf; if (pet.gameObject.activeSelf != pa) pet.gameObject.SetActive(pa); }
             // kuryer
             if (courier.gameObject.activeSelf)
             {
@@ -1288,6 +1416,7 @@ namespace CozyCourier
                 bool blink = inv > 0 && Mathf.FloorToInt(Time.time * 8f) % 2 == 0;
                 courierBody.gameObject.SetActive(!blink);
                 AnimateBody(moving);
+                UpdatePet(dt, moving);
                 headlight.transform.localPosition = Art.W(pos.x + Mathf.Cos(ang) * 34, pos.y + Mathf.Sin(ang) * 34);
                 headlight.color = new Color(1, .94f, .8f, .45f * nk);
                 // chang izi

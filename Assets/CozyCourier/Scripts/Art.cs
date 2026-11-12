@@ -339,6 +339,29 @@ namespace CozyCourier
         {
             float k = Art.Rnd(seed * 3.17f + 1.3f);
             Color a, b, cc;
+            if (Weather.Season == Season.Winter)
+            {
+                // qish: yalang'och shoxlar va qor
+                Ellipse(x + r * .7f, y + r * .2f, r * 1.1f, r * .45f, new Color(.08f, .11f, .16f, .18f));
+                Rect(x - 2, y - r * 1.3f, 4, r * 1.3f, Art.Hex("#6f513a"));
+                Line(x, y - r * .9f, x - r * .7f, y - r * 1.7f, 2, Art.Hex("#6f513a"));
+                Line(x, y - r * 1.1f, x + r * .7f, y - r * 1.8f, 2, Art.Hex("#6f513a"));
+                Line(x, y - r * 1.3f, x, y - r * 2.1f, 2, Art.Hex("#6f513a"));
+                Circle(x - r * .5f, y - r * 1.7f, r * .5f, new Color(1, 1, 1, .92f));
+                Circle(x + r * .5f, y - r * 1.8f, r * .45f, new Color(.93f, .96f, 1, .92f));
+                Circle(x, y - r * 2.1f, r * .5f, new Color(1, 1, 1, .95f));
+                return;
+            }
+            if (Weather.Season == Season.Spring && k > .55f)
+            {
+                // bahor: gullagan daraxtlar
+                Ellipse(x + r * .7f, y + r * .2f, r * 1.1f, r * .45f, new Color(.08f, .11f, .16f, .22f));
+                Rect(x - 2, y - r, 4, r, Art.Hex("#6f513a"));
+                Circle(x, y - r * 1.25f, r, Art.Hex("#f7a8c4"));
+                Circle(x - r * .28f, y - r * 1.45f, r * .7f, Art.Hex("#ffc0d6"));
+                Circle(x - r * .45f, y - r * 1.65f, r * .32f, Art.Hex("#ffe3ec"));
+                return;
+            }
             if (k < 1 - greens) { a = Art.Hex("#c9772f"); b = Art.Hex("#e0a03a"); cc = Art.Hex("#f2c25a"); }
             else if (k < 1 - greens * .4f) { a = Art.Hex("#4e8250"); b = Art.Hex("#69a064"); cc = Art.Hex("#86b878"); }
             else { a = Art.Hex("#b5543b"); b = Art.Hex("#d9734a"); cc = Art.Hex("#ee9a62"); }

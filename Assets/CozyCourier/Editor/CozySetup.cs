@@ -39,12 +39,14 @@ namespace CozyCourier.EditorTools
         {
             bool admob = HasType("GoogleMobileAds.Api.MobileAds") && HasType("GoogleMobileAds.Ump.Api.ConsentInformation");
             bool iap = HasType("UnityEngine.Purchasing.UnityIAPServices") && HasType("Unity.Services.Core.UnityServices");
+            bool pgs = HasType("GooglePlayGames.PlayGamesPlatform");
+            bool notif = HasType("Unity.Notifications.Android.AndroidNotificationCenter");
             foreach (var t in new[] { NamedBuildTarget.Android, NamedBuildTarget.iOS, NamedBuildTarget.Standalone })
             {
                 string cur = PlayerSettings.GetScriptingDefineSymbols(t);
                 var list = new System.Collections.Generic.List<string>();
                 foreach (var d in cur.Split(';')) if (d.Trim().Length > 0) list.Add(d.Trim());
-                bool changed = Toggle(list, "COZY_ADMOB", admob) | Toggle(list, "COZY_IAP", iap);
+                bool changed = Toggle(list, "COZY_ADMOB", admob) | Toggle(list, "COZY_IAP", iap) | Toggle(list, "COZY_PGS", pgs) | Toggle(list, "COZY_NOTIF", notif);
                 if (changed)
                 {
                     PlayerSettings.SetScriptingDefineSymbols(t, string.Join(";", list));

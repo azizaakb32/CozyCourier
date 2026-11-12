@@ -423,7 +423,7 @@ namespace CozyCourier
             }
             b.labelPos = new Vector2(sx + sw / 2 + 14 * Art.OX, sy + 8 + 14 * Art.OY);
             signs.Add(new KeyValuePair<Vector2, Color>(b.labelPos, b.color));
-            mb.Tree(x0 + 8, y0 + 12, 8, seed, D.trees);
+            mb.Tree(x0 + 8, y0 + 12, 8, seed, Weather.Greens(D.trees));
         }
 
         // ================================================================ uy
@@ -594,7 +594,7 @@ namespace CozyCourier
                 float rx = x + h * Art.OX, ry = y + h * Art.OY;
                 for (int i = 0; i < 6; i++) mb.Circle(rx + w - 30 + i * 5, ry + d - 8 + (i % 2) * 3, 5, i % 2 == 1 ? Art.Hex("#5f8f4e") : Art.Hex("#4b7a40"), 8);
             }
-            mb.Tree(x0 + 11, y0 + BS - 9, 9, seed, D.trees);
+            mb.Tree(x0 + 11, y0 + BS - 9, 9, seed, Weather.Greens(D.trees));
         }
 
         void BuildTall(Block b, MB glow)
@@ -605,7 +605,7 @@ namespace CozyCourier
             if (b.type == "park")
             {
                 float[,] trees = { { 26, 28, 13 }, { 114, 30, 12 }, { 30, 112, 13 }, { 112, 112, 14 }, { 62, 108, 9 }, { 98, 54, 9 }, { 46, 64, 8 } };
-                for (int i = 0; i < trees.GetLength(0); i++) mb.Tree(x0 + trees[i, 0], y0 + trees[i, 1], trees[i, 2], seed + i, D.trees);
+                for (int i = 0; i < trees.GetLength(0); i++) mb.Tree(x0 + trees[i, 0], y0 + trees[i, 1], trees[i, 2], seed + i, Weather.Greens(D.trees));
                 mb.Box(x0 + BS / 2 - 16, y0 + BS - 30, 32, 7, 6, Art.Hex("#9a7452"));
                 mb.Box(x0 + 16, y0 + BS / 2 + 16, 7, 28, 6, Art.Hex("#9a7452"));
             }

@@ -289,13 +289,19 @@ namespace CozyCourier
             new Upg{ id="nav", name=T("Navigator","Навигатор","Navigator"), desc=T("Butun yo'l chiziladi, YHXB postlarini aylanib o'tadi, ikkinchi buyurtma ham ko'rinadi","Весь маршрут, объезжает посты ДПС, видно и второй заказ","Full route that avoids police posts, plus your second order"), prices=new[]{50000}, col="#7ec8e3" },
             new Upg{ id="ins", name=T("Sug'urta","Страховка","Insurance"), desc=T("Barcha shtraflar ikki baravar kam","Все штрафы в два раза меньше","All fines are halved"), prices=new[]{70000}, col="#8fd6a8" },
         };
-        public static readonly string[] LookCats = { "scooter", "helmet", "bag" };
+        public static readonly string[] LookCats = { "scooter", "helmet", "bag", "pet" };
         public static readonly Dictionary<string, string[]> LookTitle = new Dictionary<string, string[]>
         {
-            {"scooter", T("Transport rangi","Цвет транспорта","Vehicle colour")}, {"helmet", T("Shlem","Шлем","Helmet")}, {"bag", T("Sumka","Сумка","Bag")},
+            {"scooter", T("Transport rangi","Цвет транспорта","Vehicle colour")}, {"helmet", T("Shlem","Шлем","Helmet")}, {"bag", T("Sumka","Сумка","Bag")}, {"pet", T("Hamroh","Питомец","Pet")},
         };
         public static readonly Dictionary<string, LookItem[]> Looks = new Dictionary<string, LookItem[]>
         {
+            {"pet", new[]{
+                new LookItem{ id="none", name=T("Hamrohsiz","Без питомца","No pet"), c0="#5a6f84", c1="#3a4a5a" },
+                new LookItem{ id="cat", name=T("Sariq mushuk","Рыжий кот","Ginger cat"), c0="#f0a35a", c1="#c9772f", price=25000, lvl=3 },
+                new LookItem{ id="blackcat", name=T("Qora mushuk","Чёрный кот","Black cat"), c0="#3a3a44", c1="#1f1f26", price=40000, lvl=6 },
+                new LookItem{ id="whitecat", name=T("Oppoq mushuk","Белый кот","White cat"), c0="#f4f1ea", c1="#d6cfc2", price=55000, lvl=9 },
+                new LookItem{ id="dog", name=T("Kuchukcha","Щенок","Puppy"), c0="#c98a4b", c1="#7a4a2c", price=70000, lvl=12 } }},
             {"scooter", new[]{
                 new LookItem{ id="teal", name=T("Firuza","Бирюза","Turquoise"), c0="#46d0bf", c1="#25877c" },
                 new LookItem{ id="red", name=T("Anor","Гранат","Pomegranate"), c0="#ff8a7a", c1="#c2412f", price=15000 },
@@ -303,17 +309,29 @@ namespace CozyCourier
                 new LookItem{ id="yellow", name=T("Limon","Лимон","Lemon"), c0="#ffe08a", c1="#d4a72c", price=15000 },
                 new LookItem{ id="blue", name=T("Osmon","Небо","Sky"), c0="#8cc4ff", c1="#2f6fc2", price=20000 },
                 new LookItem{ id="night", name=T("Tungi","Ночной","Night"), c0="#6a7480", c1="#22282e", price=25000 },
+                new LookItem{ id="mint", name=T("Yalpiz","Мята","Mint"), c0="#c8f5e0", c1="#3fae8a", price=35000, lvl=8 },
+                new LookItem{ id="neon", name=T("Neon","Неон","Neon"), c0="#9cf7ff", c1="#ff4fa3", price=80000, lvl=15 },
+                new LookItem{ id="choyxona", name=T("Choynak ko'k","Чайник синий","Teapot blue"), c0="#ffffff", c1="#2c6aa8", price=120000, lvl=22 },
+                new LookItem{ id="lazurit", name=T("Lazurit","Лазурит","Lapis"), c0="#7fa8ff", c1="#1d3f9e", price=200000, lvl=30 },
                 new LookItem{ id="gold", name=T("Oltin","Золотой","Golden"), c0="#ffe08a", c1="#c9962a", vip=true } }},
             {"helmet", new[]{
                 new LookItem{ id="orange", name=T("To'q sariq","Оранжевый","Orange"), c0="#ffcf8a", c1="#e88a3c" },
                 new LookItem{ id="white", name=T("Oq","Белый","White"), c0="#ffffff", c1="#c2cbd1", price=10000 },
                 new LookItem{ id="green", name=T("Yashil","Зелёный","Green"), c0="#b8f0a0", c1="#4fa35a", price=10000 },
                 new LookItem{ id="pink", name=T("Pushti","Розовый","Pink"), c0="#ffc0d6", c1="#d9638e", price=12000 },
-                new LookItem{ id="gold", name=T("Oltin","Золотой","Gold"), c0="#fff0a8", c1="#d6a62a", price=40000, lvl=5 } }},
+                new LookItem{ id="gold", name=T("Oltin","Золотой","Gold"), c0="#fff0a8", c1="#d6a62a", price=40000, lvl=5 },
+                new LookItem{ id="sky", name=T("Moviy osmon","Голубое небо","Blue sky"), c0="#bfe3ff", c1="#3d7fd0", price=60000, lvl=12 },
+                new LookItem{ id="ruby", name=T("Yoqut","Рубин","Ruby"), c0="#ff9aa8", c1="#b5203a", price=110000, lvl=18 },
+                new LookItem{ id="emerald", name=T("Zumrad","Изумруд","Emerald"), c0="#9ef0c0", c1="#1f8a55", price=180000, lvl=26 },
+                new LookItem{ id="crown", name=T("Shoh","Шах","Shah"), c0="#fff3c4", c1="#b8860b", price=300000, lvl=40 } }},
             {"bag", new[]{
                 new LookItem{ id="orange", name=T("Klassik","Классика","Classic"), c0="#f8ad66", c1="#e18a42" },
                 new LookItem{ id="blue", name=T("Moviy","Синяя","Blue"), c0="#8cc4ff", c1="#3d7fd0", price=12000 },
-                new LookItem{ id="ikat", name=T("Atlas naqshli","С узором атлас","Atlas silk pattern"), c0="#e85d75", c1="#3d7fd0", price=30000, ikat=true } }},
+                new LookItem{ id="ikat", name=T("Atlas naqshli","С узором атлас","Atlas silk pattern"), c0="#e85d75", c1="#3d7fd0", price=30000, ikat=true },
+                new LookItem{ id="green", name=T("Bog'","Сад","Garden"), c0="#b8f0a0", c1="#4fa35a", price=45000, lvl=10 },
+                new LookItem{ id="choc", name=T("Shokolad","Шоколад","Chocolate"), c0="#c98a4b", c1="#6b3e22", price=90000, lvl=16 },
+                new LookItem{ id="adras", name=T("Adras","Адрас","Adras silk"), c0="#ffd166", c1="#7b4a8c", price=160000, lvl=24, ikat=true },
+                new LookItem{ id="royal", name=T("Saroy","Дворец","Palace"), c0="#e9c46a", c1="#2a2346", price=350000, lvl=50 } }},
         };
         public static LookItem Look(string cat, string id)
         {

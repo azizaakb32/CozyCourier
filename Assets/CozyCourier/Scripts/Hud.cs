@@ -10,7 +10,7 @@ namespace CozyCourier
     {
         Game G => Game.I;
 
-        enum View { Menu, Free, Settings, Help, Garage, Play, Pause, End, Cut, Shop }
+        enum View { Menu, Free, Settings, Help, Garage, Play, Pause, End, Cut, Shop, Daily }
         View view = View.Menu;
         public bool MenuIsRoot => view == View.Menu;
 
@@ -23,7 +23,11 @@ namespace CozyCourier
         readonly List<RectTransform> markerPool = new List<RectTransform>();
 
         // oynalar
-        RectTransform ovMenu, ovFree, ovSettings, ovHelp, ovGarage, ovPause, ovEnd, ovShop;
+        RectTransform ovMenu, ovFree, ovSettings, ovHelp, ovGarage, ovPause, ovEnd, ovShop, ovDaily;
+        RectTransform dCal, dTasks; UText dToast, menuDailyLbl, endStars; Button dClaim; Image menuDot;
+        bool dailyAutoShown;
+        Image weatherTint; string particleMode = "";
+        RectTransform tutBox; UText tutTxt; Image tutHand;
         RectTransform shopItems; UText shopToast, shopWallet, gAdBtnLbl; Button gAdBtn; bool shopFromGarage;
         UText menuWallet, menuLvl, storySub, setToast, gWallet, gLvl, gToast, endEyebrow, endTitle, endMoney, endInfo, endUnlock, endToast;
         RectTransform districtsBox, confirmBox, gItems, gTabs;
@@ -65,6 +69,7 @@ namespace CozyCourier
 
             vignette = UI.Pic(root, Art.Vignette, new Color(.04f, .03f, .1f, .55f), "Vignette");
             UI.Fill(vignette.rectTransform);
+            weatherTint = UI.Pic(root, Art.Square, Color.clear, "WeatherTint"); UI.Fill(weatherTint.rectTransform);
             BuildLeaves();
             markers = UI.Node("Markers", root); UI.Fill(markers);
             BuildLeft();
@@ -80,6 +85,8 @@ namespace CozyCourier
             ovPause = BuildPause();
             ovEnd = BuildEnd();
             ovShop = BuildShop();
+            ovDaily = BuildDaily();
+            BuildTut();
             Shop.OnResult -= OnShopResult; Shop.OnResult += OnShopResult;
             BuildCut();
         }
@@ -96,6 +103,7 @@ namespace CozyCourier
                 case View.Settings: OpenSettings(); break;
                 case View.Help: Open(View.Help, ovHelp); break;
                 case View.Shop: OpenShop(shopFromGarage); break;
+                case View.Daily: OpenDaily(); break;
                 case View.Garage: ShowGarage(); break;
                 case View.Play: ShowPlay(); break;
                 case View.Pause: ShowPause(); break;
@@ -312,11 +320,52 @@ namespace CozyCourier
             }
         }
 
+        /// <summary>Fasl va ob-havoga qarab zarrachalar: kuz barglari, bahor gulbarglari, qor, yomg'ir.</summary>
+        void StyleParticles()
+        {
+            bool play = view == View.Play || view == View.Pause;
+            string w = play ? Weather.Now : "clear";
+            string mode = w == "rain" ? "rain" : w == "snow" ? "snow" : Weather.Season.ToString();
+            if (weatherTint != null)
+            {
+                Color tc = w == "rain" ? new Color(.2f, .3f, .48f, .16f) : w == "snow" ? new Color(.86f, .92f, 1f, .1f) : w == "fog" ? new Color(.85f, .88f, .92f, .22f)
+                    : Weather.Season == Season.Winter ? new Color(.86f, .92f, 1f, .06f) : Color.clear;
+                weatherTint.color = Color.Lerp(weatherTint.color, view == View.Cut ? Color.clear : tc, .05f);
+            }
+            if (mode == particleMode) return;
+            particleMode = mode;
+            string[] cols; int count; float size, vy, vx; bool streak = false;
+            switch (mode)
+            {
+                case "rain": cols = new[] { "#bcd4f0" }; count = 30; size = 2; vy = 900; vx = 170; streak = true; break;
+                case "snow": cols = new[] { "#ffffff", "#eef4ff" }; count = 30; size = 7; vy = 60; vx = 14; break;
+                case "Winter": cols = new[] { "#ffffff", "#eef4ff" }; count = 14; size = 6; vy = 40; vx = 10; break;
+                case "Spring": cols = new[] { "#ffc0d6", "#ffe3ec", "#f7a8c4" }; count = 14; size = 10; vy = 26; vx = 16; break;
+                case "Summer": cols = new[] { "#86b878", "#69a064" }; count = 6; size = 10; vy = 22; vx = 14; break;
+                default: cols = new[] { "#e0a03a", "#c9772f", "#d9734a", "#f2c25a", "#b5543b" }; count = 16; size = 12; vy = 30; vx = 20; break;
+            }
+            for (int i = 0; i < leaves.Count; i++)
+            {
+                var l = leaves[i];
+                bool on = i < count;
+                l.rt.gameObject.SetActive(on);
+                if (!on) continue;
+                float k = .7f + Random.value * .6f;
+                l.im.color = Art.Hex(cols[i % cols.Length], streak ? .45f : .85f);
+                l.rt.sizeDelta = streak ? new Vector2(2, 22 + Random.value * 14) : (mode == "snow" || mode == "Winter") ? new Vector2(size * k, size * k) : new Vector2(size * k, size * k * .55f);
+                l.vy = vy * k; l.vx = vx * k;
+                l.rot = streak ? 11 : Random.value * 360;
+                l.vr = (mode == "snow" || mode == "Winter") ? 0 : -60 + Random.value * 120;
+                l.rt.localRotation = Quaternion.Euler(0, 0, l.rot);
+            }
+        }
+
         void BuildLeaves()
         {
             leafLayer = UI.Node("Leaves", root); UI.Fill(leafLayer);
             string[] cols = { "#e0a03a", "#c9772f", "#d9734a", "#f2c25a", "#b5543b" };
-            for (int i = 0; i < 16; i++)
+            particleMode = "";
+            for (int i = 0; i < 30; i++)
             {
                 var im = UI.Pic(leafLayer, Art.Circle, Art.Hex(cols[i % cols.Length], .85f), "leaf");
                 var l = new Leaf { rt = im.rectTransform, im = im, x = Random.value * 1600, y = Random.value * 900, vx = 10 + Random.value * 20, vy = 18 + Random.value * 24, rot = Random.value * 360, vr = -60 + Random.value * 120, ph = Random.value * 6 };
@@ -332,7 +381,10 @@ namespace CozyCourier
             var ov = Overlay("Menu", out var card, 560, new Vector2(0, .5f), new Vector2(0, .5f), new Vector2(40, 0), .35f);
             Txt(card, Loc.Get("tagline").ToUpper(), 17, UI.Gold, 24, TextAnchor.MiddleLeft, FontStyle.Bold);
             Txt(card, "Cozy <color=#f4a259>Courier</color>", 60, UI.Fg, 72, TextAnchor.MiddleLeft, FontStyle.Bold);
-            Txt(card, Loc.Get("mmTag"), 19, UI.Muted, 54);
+            var db = Big(card, Loc.Get("daily"), Loc.Get("dailySub"), Art.Hex("#2f9e92"), Art.Hex("#06231f"), OpenDaily, 58);
+            menuDailyLbl = db.GetComponentInChildren<UText>();
+            menuDot = UI.Pic(db.transform, Art.Circle, UI.Soft, "dot");
+            UI.Place(menuDot.rectTransform, new Vector2(1, 1), new Vector2(.5f, .5f), new Vector2(-14, -12), new Vector2(18, 18));
             LangRow(card, 44);
             var row = UI.Node("profile", card); UI.HL(row, 0, 10); UI.LE(row, 30);
             menuWallet = UI.Label(row, "", 20, UI.Fg, TextAnchor.MiddleLeft, FontStyle.Bold);
@@ -399,6 +451,11 @@ namespace CozyCourier
             Row(card, Loc.Get("resetStory"), Loc.Get("restart"), () => { Save.Chapter = 0; setToast.text = Loc.Get("storyReset"); });
             Row(card, Loc.Get("resetAll"), Loc.Get("erase"), () => confirmBox.gameObject.SetActive(true));
             if (Ads.PrivacyRequired) Row(card, Loc.Get("privacy"), "›", Ads.ShowPrivacy);
+            if (Cloud.Available)
+            {
+                Row(card, Loc.Get("leaderboard"), Loc.Get("open"), Cloud.ShowLeaderboard);
+                Row(card, Loc.Get("achievements"), Loc.Get("open"), Cloud.ShowAchievements);
+            }
             var cb = UI.Box(card, Art.Hex("#3a2a24"), "confirm");
             confirmBox = cb.rectTransform;
             UI.VL(cb, 14, 8);
@@ -777,6 +834,125 @@ namespace CozyCourier
             gAdBtnLbl.text = wait > 0 ? Loc.Get("adWait", wait) : (Save.NoAds ? "★ " : "▶ ") + Loc.Get("adCoins", Loc.Money(Ads.AD_COINS));
         }
 
+        // ---------------------------------------------------------------- kunlik sovg'a va vazifalar
+        RectTransform BuildDaily()
+        {
+            var ov = Overlay("Daily", out var card, 900);
+            Txt(card, Loc.Get("dailyTitle"), 30, UI.Fg, 38, TextAnchor.MiddleLeft, FontStyle.Bold);
+            dCal = UI.Node("cal", card); UI.HL(dCal, 0, 8); UI.LE(dCal, 96);
+            var row = UI.Node("claimRow", card); UI.HL(row, 0, 10); UI.LE(row, 52);
+            var info = UI.Label(row, Loc.Get("streakInfo"), 15, UI.Muted); UI.LE(info, -1, -1, 3);
+            dClaim = UI.Btn(row, "", UI.Gold, Dark, OnClaimDaily, 22); UI.LE(dClaim, -1, -1, 1);
+            Txt(card, Loc.Get("tasksToday"), 22, UI.Fg, 30, TextAnchor.MiddleLeft, FontStyle.Bold);
+            dTasks = UI.Node("tasks", card); UI.VL(dTasks, 0, 8);
+            var f = dTasks.gameObject.AddComponent<ContentSizeFitter>(); f.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+            dToast = Txt(card, "", 18, UI.Ok, 24);
+            BackBtn(card, ShowMenu);
+            return ov;
+        }
+
+        void OpenDaily()
+        {
+            Open(View.Daily, ovDaily);
+            dToast.text = "";
+            RenderDaily();
+        }
+
+        void RenderDaily()
+        {
+            Clear(dCal);
+            int today = Daily.TodayIndex; bool avail = Daily.RewardAvailable;
+            for (int i = 0; i < 7; i++)
+            {
+                bool got = i < today || (!avail && i == today), now = avail && i == today;
+                var cell = UI.Box(dCal, now ? UI.Gold : got ? Art.Hex("#1f4d47") : new Color(1, 1, 1, .06f), "day");
+                var t1 = UI.Label(cell.transform, Loc.Get("dayN", i + 1), 15, now ? Dark : UI.Muted, TextAnchor.UpperCenter, FontStyle.Bold);
+                UI.Place(t1.rectTransform, new Vector2(.5f, 1), new Vector2(.5f, 1), new Vector2(0, -8), new Vector2(110, 20));
+                string body = got ? "✓" : Loc.Num(Daily.Rewards[i]) + (i == 6 && Daily.Day7Cat ? "\n" + Loc.Get("catGift") : "");
+                var t2 = UI.Label(cell.transform, body, got ? 30 : (i == 6 ? 17 : 20), now ? Dark : got ? UI.Teal : UI.Fg, TextAnchor.MiddleCenter, FontStyle.Bold);
+                UI.Place(t2.rectTransform, new Vector2(.5f, .5f), new Vector2(.5f, .5f), new Vector2(0, -10), new Vector2(110, 60));
+            }
+            dClaim.interactable = avail;
+            dClaim.GetComponentInChildren<UText>().text = avail ? Loc.Get("claim") + " +" + Loc.Num(Daily.Rewards[today]) : Loc.Get("tomorrow");
+
+            Clear(dTasks);
+            for (int i = 0; i < 3; i++)
+            {
+                var t = Daily.Task(i);
+                int p = Daily.Progress(i); bool done = Daily.Done(i), cl = Daily.Claimed(i);
+                var box = UI.Box(dTasks, new Color(1, 1, 1, cl ? .03f : .06f), "task");
+                UI.LE(box, 64);
+                var tt = UI.Label(box.transform, Daily.Text(t), 19, cl ? UI.Muted : UI.Fg, TextAnchor.UpperLeft, FontStyle.Bold);
+                UI.Place(tt.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(16, -10), new Vector2(560, 26));
+                var rw = UI.Label(box.transform, "+" + Loc.Money(t.reward), 16, Art.Hex("#ffcf8a"), TextAnchor.UpperLeft, FontStyle.Bold);
+                UI.Place(rw.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(16, -36), new Vector2(200, 22));
+                var bg = UI.Pic(box.transform, Art.Square, new Color(1, 1, 1, .1f), "bar");
+                UI.Place(bg.rectTransform, new Vector2(0, 0), new Vector2(0, 0), new Vector2(230, 16), new Vector2(330, 8));
+                var fill = UI.Pic(bg.transform, Art.Square, done ? UI.Ok : UI.Teal, "fill");
+                fill.type = Image.Type.Filled; fill.fillMethod = Image.FillMethod.Horizontal; fill.fillAmount = Mathf.Clamp01(p / (float)t.goal);
+                UI.Fill(fill.rectTransform);
+                var pt = UI.Label(box.transform, t.money ? Loc.Num(p) + " / " + Loc.Num(t.goal) : p + " / " + t.goal, 14, UI.Muted, TextAnchor.LowerLeft);
+                UI.Place(pt.rectTransform, new Vector2(0, 0), new Vector2(0, 0), new Vector2(230, 26), new Vector2(330, 18));
+                int idx = i;
+                var b = UI.Btn(box.transform, cl ? "✓ " + Loc.Get("claimed") : Loc.Get("claim"), cl ? UI.Panel2 : done ? UI.Ok : Art.Hex("#2a3a42"), cl ? UI.Muted : done ? Dark : UI.Muted, () =>
+                {
+                    int r = Daily.ClaimTask(idx);
+                    if (r > 0) { G.sfx.Arp(659, 784, 988); dToast.text = Loc.Get("gotMoney", Loc.Money(r)); RenderDaily(); }
+                }, 18);
+                UI.Place((RectTransform)b.transform, new Vector2(1, .5f), new Vector2(1, .5f), new Vector2(-14, 0), new Vector2(150, 46));
+                b.interactable = done && !cl;
+                var cb = b.colors; cb.disabledColor = Color.white; b.colors = cb;
+            }
+        }
+
+        void OnClaimDaily()
+        {
+            bool cat = Daily.TodayIndex == 6 && Daily.Day7Cat;
+            int r = Daily.ClaimReward();
+            if (r <= 0) return;
+            G.sfx.Arp(523, 659, 784, 1047);
+            dToast.text = Loc.Get("gotMoney", Loc.Money(r)) + (cat ? " " + Loc.Get("catGift") : "");
+            if (cat) G.ApplyLook();
+            RenderDaily();
+        }
+
+        // ---------------------------------------------------------------- o'rgatish
+        void BuildTut()
+        {
+            var b = UI.Box(root, Art.Hex("#101b22", .92f), "Tutorial");
+            tutBox = b.rectTransform;
+            UI.Place(tutBox, new Vector2(.5f, 0), new Vector2(.5f, 0), new Vector2(0, 120), new Vector2(720, 70));
+            var dot = UI.Pic(tutBox, Art.Circle, UI.Gold, "dot");
+            UI.Place(dot.rectTransform, new Vector2(0, .5f), new Vector2(0, .5f), new Vector2(18, 0), new Vector2(30, 30));
+            var q = UI.Label(dot.transform, "!", 20, Dark, TextAnchor.MiddleCenter, FontStyle.Bold); UI.Fill(q.rectTransform);
+            tutTxt = UI.Label(tutBox, "", 21, UI.Fg, TextAnchor.MiddleLeft, FontStyle.Bold);
+            tutTxt.rectTransform.anchorMin = Vector2.zero; tutTxt.rectTransform.anchorMax = Vector2.one;
+            tutTxt.rectTransform.offsetMin = new Vector2(62, 6); tutTxt.rectTransform.offsetMax = new Vector2(-16, -6);
+            // joystik ustidagi "barmoq" belgisi
+            tutHand = UI.Pic(root, Art.Circle, new Color(1, 1, 1, .5f), "TutHand");
+            UI.Place(tutHand.rectTransform, Vector2.zero, new Vector2(.5f, .5f), new Vector2(150, 150), new Vector2(70, 70));
+            tutHand.raycastTarget = false;
+            tutBox.gameObject.SetActive(false); tutHand.gameObject.SetActive(false);
+        }
+
+        void UpdateTut()
+        {
+            if (tutBox == null) return;
+            bool show = view == View.Play && G.tut >= 0;
+            if (tutBox.gameObject.activeSelf != show) tutBox.gameObject.SetActive(show);
+            bool hand = show && G.tut == 0;
+            if (tutHand.gameObject.activeSelf != hand) tutHand.gameObject.SetActive(hand);
+            if (!show) return;
+            tutTxt.text = Loc.Get("tut" + Mathf.Clamp(G.tut, 0, 3));
+            float pulse = .5f + .5f * Mathf.Sin(Time.time * 4f);
+            tutBox.localScale = Vector3.one * (1f + .015f * pulse);
+            if (hand)
+            {
+                tutHand.rectTransform.anchoredPosition = new Vector2(150 + Mathf.Sin(Time.time * 2f) * 40, 150);
+                tutHand.color = new Color(1, 1, 1, .25f + .3f * pulse);
+            }
+        }
+
         // ---------------------------------------------------------------- pauza va yakun
         RectTransform BuildPause()
         {
@@ -795,6 +971,7 @@ namespace CozyCourier
         {
             var ov = Overlay("End", out var card, 680);
             endEyebrow = Txt(card, "", 17, UI.Gold, 24, TextAnchor.MiddleLeft, FontStyle.Bold);
+            endStars = Txt(card, "", 40, UI.Gold, 46, TextAnchor.MiddleLeft, FontStyle.Bold);
             endTitle = Txt(card, "", 32, UI.Fg, 44, TextAnchor.MiddleLeft, FontStyle.Bold);
             endMoney = Txt(card, "", 48, Art.Hex("#ffcf8a"), 60, TextAnchor.MiddleLeft, FontStyle.Bold);
             endInfo = Txt(card, "", 18, UI.Muted, 108);
@@ -969,7 +1146,7 @@ namespace CozyCourier
         // ========================= KO'RSATISH =========================
         void HideAll()
         {
-            foreach (var o in new[] { ovMenu, ovFree, ovSettings, ovHelp, ovGarage, ovPause, ovEnd, ovShop }) if (o != null) o.gameObject.SetActive(false);
+            foreach (var o in new[] { ovMenu, ovFree, ovSettings, ovHelp, ovGarage, ovPause, ovEnd, ovShop, ovDaily }) if (o != null) o.gameObject.SetActive(false);
         }
 
         void SetHud(bool on)
@@ -990,7 +1167,8 @@ namespace CozyCourier
 
         public void Back()
         {
-            if (view == View.Garage) GarageBack();
+            if (view == View.Daily) ShowMenu();
+            else if (view == View.Garage) GarageBack();
             else if (view == View.Shop) ShopBack();
             else if (view == View.Free || view == View.Settings || view == View.Help) ShowMenu();
             else if (view == View.End) G.EndToMenu();
@@ -1004,6 +1182,8 @@ namespace CozyCourier
             int L = Save.Level, a = Save.Need(L), b = Save.Need(L + 1);
             menuLvl.text = Loc.Get("level") + " " + L + " · " + (Save.XP - a) + " / " + (b - a) + " XP";
             storySub.text = StoryText();
+            if (menuDot != null) menuDot.gameObject.SetActive(Daily.Badge);
+            if (!dailyAutoShown && Daily.RewardAvailable) { dailyAutoShown = true; OpenDaily(); }
         }
 
         public void ShowPlay() { view = View.Play; HideAll(); if (cutLayer != null) cutLayer.gameObject.SetActive(false); SetHud(true); Refresh(); }
@@ -1025,11 +1205,14 @@ namespace CozyCourier
             endInfo.text = Loc.Get("endInfo", Loc.Money(G.money), Loc.Money(G.tips), Loc.Money(G.fines), G.hits, G.lates, G.reds, G.done, G.rating.ToString("0.0"), G.xpGain, Loc.Money(Save.Wallet))
                 + (rec ? "  ·  <color=#46d0bf><b>" + Loc.Get("record") + "</b></color>" : "");
             var u = new List<string>();
-            foreach (int L in G.lvlUps)
+            for (int li = 0; li < G.lvlUps.Count; li++)
             {
+                int L = G.lvlUps[li];
                 string ut = Game.UnlockText(L);
-                u.Add("<b>" + Loc.Get("lvlUpEnd", L) + "</b> " + (ut.Length > 0 ? Loc.Get("unlocked", ut) + "." : Loc.Get("seeGarage")));
+                string rw = li < G.lvlRewards.Count ? " <color=#ffcf8a>" + Loc.Get("lvlReward", Loc.Money(G.lvlRewards[li])) + "</color>" : "";
+                u.Add("<b>" + Loc.Get("lvlUpEnd", L) + "</b>" + rw + " " + (ut.Length > 0 ? Loc.Get("unlocked", ut) + "." : Loc.Get("seeGarage")));
             }
+            endStars.text = "<color=#ffd166>" + new string('★', G.lastStars) + "</color><color=#ffffff33>" + new string('★', 3 - G.lastStars) + "</color>";
             endUnlock.text = string.Join("\n", u);
             endUnlock.gameObject.SetActive(u.Count > 0);
             endNextLbl.text = story ? Loc.Get("contStory") : Loc.Get("again");
@@ -1165,15 +1348,18 @@ namespace CozyCourier
             bool cutLeaves = cutBg == "street" || cutBg == "yard";
             bool showLeaves = view != View.Cut || cutLeaves;
             leafLayer.gameObject.SetActive(showLeaves);
+            StyleParticles();
             if (showLeaves)
             {
                 var size = root.rect.size;
                 float t = Time.time;
+                bool rain = particleMode == "rain";
                 foreach (var l in leaves)
                 {
-                    l.x += (l.vx + Mathf.Sin(t * .8f + l.ph) * 18) * dt;
+                    if (!l.rt.gameObject.activeSelf) continue;
+                    l.x += (l.vx + (rain ? 0 : Mathf.Sin(t * .8f + l.ph) * 18)) * dt;
                     l.y += l.vy * dt;
-                    l.rot += l.vr * dt;
+                    if (!rain) l.rot += l.vr * dt;
                     if (l.y > size.y + 20) { l.y = -20; l.x = Random.value * size.x; }
                     if (l.x > size.x + 20) l.x = -20;
                     l.rt.anchoredPosition = new Vector2(l.x, -l.y);
@@ -1183,6 +1369,7 @@ namespace CozyCourier
 
             if (view == View.Garage && Time.frameCount % 30 == 0) UpdateAdBtn();
             UpdateGhost();
+            UpdateTut();
             if (view == View.Play) Markers();
             else if (markers.gameObject.activeSelf) foreach (var m in markerPool) m.gameObject.SetActive(false);
         }

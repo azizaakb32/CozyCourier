@@ -5,10 +5,85 @@ namespace CozyCourier
     /// <summary>O'yin natijalarini qurilmada saqlaydi (PlayerPrefs).</summary>
     public static class Save
     {
-        static int GI(string k, int d = 0) => PlayerPrefs.GetInt("cc_" + k, d);
-        static void SI(string k, int v) { PlayerPrefs.SetInt("cc_" + k, v); PlayerPrefs.Save(); }
-        static string GS(string k, string d) => PlayerPrefs.GetString("cc_" + k, d);
-        static void SS(string k, string v) { PlayerPrefs.SetString("cc_" + k, v); PlayerPrefs.Save(); }
+        internal static int GI(string k, int d = 0) => PlayerPrefs.GetInt("cc_" + k, d);
+        internal static void SI(string k, int v) { Reg('i', k); PlayerPrefs.SetInt("cc_" + k, v); PlayerPrefs.Save(); Dirty = true; }
+        internal static string GS(string k, string d) => PlayerPrefs.GetString("cc_" + k, d);
+        internal static void SS(string k, string v) { Reg('s', k); PlayerPrefs.SetString("cc_" + k, v); PlayerPrefs.Save(); Dirty = true; }
+
+        /// <summary>Oxirgi bulutga yuklashdan keyin o'zgarish bo'ldimi.</summary>
+        public static bool Dirty;
+
+        // ---------------- kalitlar ro'yxati (bulutga saqlash uchun: PlayerPrefs kalitlarni sanab bera olmaydi)
+        static System.Collections.Generic.HashSet<string> keys;
+        static void Reg(char type, string k)
+        {
+            if (keys == null) LoadKeys();
+            string e = type + ":" + k;
+            if (keys.Contains(e)) return;
+            keys.Add(e);
+            PlayerPrefs.SetString("cc__keys", string.Join("|", keys));
+        }
+        static void LoadKeys()
+        {
+            keys = new System.Collections.Generic.HashSet<string>();
+            string raw = PlayerPrefs.GetString("cc__keys", "");
+            if (raw.Length > 0) { foreach (var e in raw.Split('|')) if (e.Length > 2) keys.Add(e); return; }
+            // eski saqlanishlar uchun: ma'lum kalitlarni tekshirib ro'yxatga qo'shamiz
+            var ints = new System.Collections.Generic.List<string> { "wallet", "xp", "best", "lang", "music", "sfx", "chapter", "gaimet", "iap_noads", "iap_vip", "iap_rocket", "tut", "d_streak", "playtime", "total_done", "total_earned" };
+            foreach (var u in Data.Upgrades) ints.Add("up_" + u.id);
+            ints.Add("up_speed");
+            foreach (var cat in Data.LookCats) foreach (var it in Data.Looks[cat]) ints.Add("own_" + cat + "_" + it.id);
+            foreach (var r in Data.Renos) ints.Add("reno_" + r.id);
+            foreach (var v in Data.Vehicles) ints.Add("veh_" + v.id);
+            foreach (var d in Data.DistrictOrder) ints.Add("seen_" + d);
+            foreach (var k in ints) if (PlayerPrefs.HasKey("cc_" + k)) keys.Add("i:" + k);
+            var strs = new System.Collections.Generic.List<string> { "district", "veh", "d_last" };
+            foreach (var cat in Data.LookCats) strs.Add("eq_" + cat);
+            foreach (var k in strs) if (PlayerPrefs.HasKey("cc_" + k)) keys.Add("s:" + k);
+            PlayerPrefs.SetString("cc__keys", string.Join("|", keys));
+        }
+
+        /// <summary>Hamma natijani matnga aylantiradi (bulut uchun).</summary>
+        public static string Export()
+        {
+            if (keys == null) LoadKeys();
+            var sb = new System.Text.StringBuilder("cozy1\n");
+            foreach (var e in keys)
+            {
+                string k = e.Substring(2);
+                if (k == "lang" || k == "music" || k == "sfx") continue; // qurilma sozlamalari
+                if (e[0] == 'i') sb.Append("i\t").Append(k).Append('\t').Append(GI(k)).Append('\n');
+                else sb.Append("s\t").Append(k).Append('\t').Append(GS(k, "").Replace("\t", " ").Replace("\n", " ")).Append('\n');
+            }
+            return sb.ToString();
+        }
+
+        /// <summary>Bulutdagi natijani qurilmaga yozadi.</summary>
+        public static bool Import(string data)
+        {
+            if (string.IsNullOrEmpty(data) || !data.StartsWith("cozy1")) return false;
+            foreach (var line in data.Split('\n'))
+            {
+                var p = line.Split('\t');
+                if (p.Length != 3) continue;
+                if (p[0] == "i" && int.TryParse(p[2], out int v)) SI(p[1], v);
+                else if (p[0] == "s") SS(p[1], p[2]);
+            }
+            Dirty = false;
+            return true;
+        }
+
+        /// <summary>Bulutdagi natijaning XP'sini (taqqoslash uchun) o'qiydi.</summary>
+        public static int PeekXp(string data)
+        {
+            if (string.IsNullOrEmpty(data)) return -1;
+            foreach (var line in data.Split('\n')) { var p = line.Split('\t'); if (p.Length == 3 && p[1] == "xp" && int.TryParse(p[2], out int v)) return v; }
+            return -1;
+        }
+
+        public static int PlayTime { get => GI("playtime"); set => SI("playtime", value); }
+        public static int TotalDone { get => GI("total_done"); set => SI("total_done", value); }
+        public static int TotalEarned { get => GI("total_earned"); set => SI("total_earned", value); }
 
         public static int Wallet { get => GI("wallet"); set => SI("wallet", Mathf.Max(0, value)); }
         public static int XP { get => GI("xp"); set => SI("xp", value); }
@@ -58,7 +133,11 @@ namespace CozyCourier
         public static void SetSeen(string d) => SI("seen_" + d, 1);
 
         public static int Need(int level) => 40 * level * (level - 1);
-        public static int LevelOf(int xp) { int l = 1; while (l < 30 && xp >= Need(l + 1)) l++; return l; }
+        public const int MAX_LEVEL = 100;
+        public static int LevelOf(int xp) { int l = 1; while (l < MAX_LEVEL && xp >= Need(l + 1)) l++; return l; }
+        /// <summary>Yangi darajaga chiqqanda beriladigan pul (har 5-darajada uch baravar).</summary>
+        public static int LevelReward(int level) => (2000 + level * 500) * (level % 5 == 0 ? 3 : 1);
+        public static bool TutDone { get => GI("tut") == 1; set => SI("tut", value ? 1 : 0); }
         public static int Level => LevelOf(XP);
 
         /// <summary>Hamma natijani o'chiradi, lekin til va ovoz sozlamalarini qoldiradi.</summary>
@@ -66,8 +145,10 @@ namespace CozyCourier
         {
             int lang = Lang; bool music = Music, sfx = Sfx, noAds = NoAds, vip = Vip, rocket = Rocket;
             PlayerPrefs.DeleteAll();
+            keys = null;
             Lang = lang; Music = music; Sfx = sfx; NoAds = noAds; Vip = vip; Rocket = rocket;
             Vehicle = "foot";
+            TutDone = true;
             if (vip) Own("scooter", "gold");
         }
     }
